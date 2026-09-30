@@ -134,8 +134,11 @@
   .count { color: var(--slate); font-size: 12px; padding: 4px 12px 0; }
 
   .tabs { display: flex; gap: 2px; background: var(--paper); border: 1px solid var(--line); border-radius: 9px; padding: 3px; margin: 0 0 14px; }
-  .tabs button { flex: 1; background: none; border: 1px solid transparent; border-radius: 7px; padding: 8px 4px; font-weight: 600;
-                 color: var(--slate); cursor: pointer; white-space: nowrap; font-size: 14px; }
+  .tabs button { flex: 1; background: none; border: 1px solid transparent; border-radius: 7px; padding: 8px 2px; font-weight: 600;
+                 color: var(--slate); cursor: pointer; white-space: nowrap; font-size: 13.5px; }
+  .radar-sum { padding: 14px 16px; } .radar-sum p { margin: 6px 0 0; color: var(--slate); font-size: 14px; }
+  .radar-sum h4 { margin: 0; font-size: 16px; }
+  .radar-box ul { margin: 6px 0 0; padding-left: 18px; } .radar-box li { margin: 2px 0; }
   .tabs button[aria-selected="true"] { background: var(--pool-soft); color: var(--pool); }
   .row { grid-template-columns: 38px 1fr auto; }
   .row.with-spark { grid-template-columns: 38px 1fr 64px auto; }
@@ -167,6 +170,7 @@
 
   <nav class="tabs" role="tablist">
     <button role="tab" data-view="market" aria-selected="true">Mercado</button>
+    <button role="tab" data-view="radar" aria-selected="false">Radar</button>
     <button role="tab" data-view="launches" aria-selected="false">Lanzamientos<span id="tab-launch-dot" hidden style="display:inline-block;width:7px;height:7px;background:var(--gold);margin-left:6px;vertical-align:2px"></span></button>
     <button role="tab" data-view="budget" aria-selected="false">Presupuesto</button>
   </nav>
@@ -194,6 +198,12 @@
     </div>
     <div class="panel list" id="list" style="margin-top:12px"></div>
   </main>
+
+  <section id="radar-view" hidden>
+    <div id="radar-summary"></div>
+    <div class="panel list picks" id="radar-list" style="margin-top:12px" hidden></div>
+    <p class="fine">El radar busca señales que en el pasado solían venir antes de una subida: menos ofertas abiertas, más ventas, tendencia y caídas que se corrigen. Se prueba en cada actualización contra el último año sin mirar el futuro, y solo muestra recomendaciones cuando esa prueba le gana al mercado. Aun así no es una garantía: los precios pueden bajar.</p>
+  </section>
 
   <section id="launches-view" hidden>
     <p class="fine" style="margin-top:0">Furnis que aparecieron en el catálogo en los últimos 30 días. Muchos bajan después de los primeros días: compara la oferta de hoy con su máximo.</p>
@@ -234,6 +244,7 @@
       </div>
     </div>
     <div class="insight" id="insight"><strong></strong><span></span></div>
+    <div class="insight good radar-box" id="radar-box" hidden><strong></strong><ul></ul></div>
     <div class="panel chart-panel">
       <div class="chart-bar">
         <div class="legend">
@@ -421,6 +432,7 @@
     const s = enrich(key, e);
     applyLiveTo(s);
     current = { ...s, days: null };
+    paintRadarBox(key);
     $("d-name").textContent = s.name;
     const img = $("d-img"); img.style.visibility = "visible"; img.onerror = () => { img.style.visibility = "hidden"; }; img.src = IMG(s.cls);
     $("d-meta").textContent = `${s.cls} en ${index.hotel}, furni de ${kindName(s.kind)}` +
@@ -630,6 +642,59 @@
     window.open(`https://t.me/${encodeURIComponent(index.bot)}?start=gangas`, "_blank", "noopener");
   });
 
+
+  // ---- radar ----
+  let prediction = null, predictionLoading = null;
+  function loadPrediction() {
+    if (!predictionLoading) {
+      predictionLoading = fetch(`prediccion.json?v=${encodeURIComponent(index.updated || "")}`)
+        .then((r) => r.ok ? r.json() : null).catch(() => null).then((d) => { prediction = d; return d; });
+    }
+    return predictionLoading;
+  }
+  const pct1 = (x) => `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x * 100).toFixed(1)}%`;
+  function radarPick(key) { return prediction && prediction.enabled ? (prediction.picks || []).find((p) => p.k === key) : null; }
+
+  async function renderRadar() {
+    const box = $("radar-summary"), list = $("radar-list");
+    box.innerHTML = `<div class="panel empty">Cargando el radar…</div>`;
+    const p = await loadPrediction();
+    if (!p) { box.innerHTML = `<div class="panel empty"><strong>El radar todavía no se ha calculado</strong>Aparecerá después de la siguiente actualización.</div>`; list.hidden = true; return; }
+    if (p.reason && !p.picks_ret && p.picks_ret !== 0) {
+      box.innerHTML = `<div class="panel empty"><strong>Todavía no hay datos suficientes</strong>${esc(p.reason)}</div>`; list.hidden = true; return;
+    }
+    const period = `${fmtDay(parseDay(p.test_from))} ${parseDay(p.test_from).getFullYear()} a ${fmtDay(parseDay(p.test_to))} ${parseDay(p.test_to).getFullYear()}`;
+    const stats = `<div class="panel summary" style="margin-top:12px">
+        <div><b class="${p.enabled && p.picks_ret > p.market_ret ? "down" : ""}">${pct1(p.picks_ret)}</b><span>Radar, en ${p.horizon_days} días</span></div>
+        <div><b>${pct1(p.market_ret)}</b><span>Mercado en general</span></div>
+        <div><b>${Math.round(p.beat_share * 100)}%</b><span>Semanas que le ganó</span></div></div>`;
+    if (!p.enabled) {
+      box.innerHTML = `<div class="panel radar-sum"><h4>Por ahora no hay recomendaciones</h4>
+        <p>Probamos las señales con ${p.test_weeks} semanas de historial (${period}), sin mirar el futuro. Todavía no le ganan al mercado con suficiente claridad, así que preferimos no recomendar nada. Se vuelve a probar en cada actualización: conforme crece el historial, esto puede cambiar.</p></div>${stats}`;
+      list.hidden = true;
+      return;
+    }
+    box.innerHTML = `<div class="panel radar-sum"><h4>Qué dice la prueba contra el pasado</h4>
+      <p>Durante ${p.test_weeks} semanas (${period}), comprar cada semana los ${p.top_n} furnis con mejor puntaje y venderlos ${p.horizon_days} días después dio un resultado típico de <b>${pct1(p.picks_ret)}</b> ya con comisión, contra ${pct1(p.market_ret)} del mercado. Le ganó al mercado ${Math.round(p.beat_share * 100)}% de las semanas y ${Math.round(p.hit_rate * 100)}% de las compras terminaron con ganancia.</p></div>${stats}`;
+    const byKey = new Map(all.map((s) => [s.key, s]));
+    const rows = (p.picks || []).map((pk) => ({ pk, s: byKey.get(pk.k) })).filter((x) => x.s);
+    list.hidden = !rows.length;
+    list.innerHTML = rows.map(({ pk, s }) => rowHtml(s, `<div class="sub">${esc(pk.why[0])}</div>`,
+      `<div class="delta ${pk.expected > 0 ? "down" : "flat"}" title="Resultado típico de puntajes así en la prueba">${pct1(pk.expected)} típico</div>`)).join("");
+    bindRows(list);
+  }
+
+  async function paintRadarBox(key) {
+    const box = $("radar-box");
+    box.hidden = true;
+    await loadPrediction();
+    const pk = radarPick(key);
+    if (!pk || !current || current.key !== key) return;
+    box.querySelector("strong").textContent = `En el radar: en la prueba, puntajes así cambiaron un típico de ${pct1(pk.expected)} en ${prediction.horizon_days} días`;
+    box.querySelector("ul").innerHTML = pk.why.map((w) => `<li>${esc(w)}</li>`).join("");
+    box.hidden = false;
+  }
+
   // ---- lanzamientos ----
   function renderLaunches() {
     const rows = all.filter((s) => s.launched).sort((a, b) => b.launched.localeCompare(a.launched) || b.sold - a.sold);
@@ -700,6 +765,8 @@
     view = name;
     document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.view === name));
     $("list-view").hidden = name !== "market"; $("launches-view").hidden = name !== "launches"; $("budget-view").hidden = name !== "budget";
+    $("radar-view").hidden = name !== "radar";
+    if (name === "radar") renderRadar();
     if (name === "launches") renderLaunches();
     if (name === "budget") renderBudget();
   }
@@ -733,7 +800,7 @@
     const inDetail = !!(key && index && index.items[key]);
     document.querySelector(".tabs").hidden = inDetail;
     $("detail-view").hidden = !inDetail;
-    if (inDetail) { ["list-view", "launches-view", "budget-view"].forEach((id) => { $(id).hidden = true; }); renderDetail(key); }
+    if (inDetail) { ["list-view", "radar-view", "launches-view", "budget-view"].forEach((id) => { $(id).hidden = true; }); renderDetail(key); }
     else { current = null; showView(view); }
   }
   window.addEventListener("hashchange", route);
