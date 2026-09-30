@@ -133,7 +133,16 @@
   .inactive { opacity: .85; }
   .count { color: var(--slate); font-size: 12px; padding: 4px 12px 0; }
 
-  .tabs { display: flex; gap: 2px; background: var(--paper); border: 1px solid var(--line); border-radius: 9px; padding: 3px; margin: 0 0 14px; }
+  .tabs { display: flex; gap: 2px; background: var(--paper); border: 1px solid var(--line); border-radius: 9px; padding: 3px; margin: 0 0 14px;
+          overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button { flex: 1 0 auto; }
+  .live-top { padding: 14px 16px; display: flex; gap: 12px; align-items: center; }
+  .live-top div { flex: 1; min-width: 0; } .live-top strong { display: block; font-size: 16px; }
+  .live-top span { color: var(--slate); font-size: 13px; }
+  .badge-new { display: inline-block; background: var(--gold); color: #fff; font-size: 11px; font-weight: 700;
+               padding: 1px 6px; border-radius: 4px; margin-right: 6px; vertical-align: 1px; }
+  .btn.ghost { background: var(--pool-soft); color: var(--pool); } .btn.ghost:hover { background: #d3e5f0; }
   .tabs button { flex: 1; background: none; border: 1px solid transparent; border-radius: 7px; padding: 8px 2px; font-weight: 600;
                  color: var(--slate); cursor: pointer; white-space: nowrap; font-size: 13.5px; }
   .radar-sum { padding: 14px 16px; } .radar-sum p { margin: 6px 0 0; color: var(--slate); font-size: 14px; }
@@ -170,6 +179,7 @@
 
   <nav class="tabs" role="tablist">
     <button role="tab" data-view="market" aria-selected="true">Mercado</button>
+    <button role="tab" data-view="live" aria-selected="false" id="tab-live" hidden><span class="live-dot"></span>En vivo</button>
     <button role="tab" data-view="radar" aria-selected="false">Radar</button>
     <button role="tab" data-view="launches" aria-selected="false">Lanzamientos<span id="tab-launch-dot" hidden style="display:inline-block;width:7px;height:7px;background:var(--gold);margin-left:6px;vertical-align:2px"></span></button>
     <button role="tab" data-view="budget" aria-selected="false">Presupuesto</button>
@@ -198,6 +208,12 @@
     </div>
     <div class="panel list" id="list" style="margin-top:12px"></div>
   </main>
+
+  <section id="live-view" hidden>
+    <div id="live-summary"></div>
+    <div class="panel list picks" id="live-list" style="margin-top:12px" hidden></div>
+    <p class="fine">Solo aparecen furnis cuyo precio se confirmó en los últimos 15 minutos y que están por debajo de su rango normal, se venden al menos una vez al día y se pueden revender en menos de un mes. Las gangas duran poco: revisa el Mercadillo antes de comprar.</p>
+  </section>
 
   <section id="radar-view" hidden>
     <div id="radar-summary"></div>
@@ -643,6 +659,75 @@
   });
 
 
+
+  // ---- pestaña En vivo ----
+  const LIVE_FRESH = 15 * 60;          // solo precios confirmados en los últimos 15 minutos
+  const seenDeals = new Map();          // furni -> cuándo apareció como oportunidad (segundos)
+  let dealsReady = false, unseen = 0;
+  try { Object.entries(JSON.parse(store.get("mercadillo-deals-seen") || "{}")).forEach(([k, v]) => seenDeals.set(k, v)); } catch {}
+
+  function liveDeals() {
+    if (!live) return [];
+    const now = Date.now() / 1000;
+    return all.filter((s) => s.liveAt && now - s.liveAt <= LIVE_FRESH && s.hasFair && s.fair >= 10 && s.price &&
+      s.sold >= MIN_VOLUME && (s.low ? s.price < s.low : s.delta <= -0.10) && Math.abs(s.price - s.fair) >= 3 &&
+      (s.dr == null || s.dr <= 30));
+  }
+  function trackDeals() {
+    const deals = liveDeals(), now = Math.round(Date.now() / 1000), current_ = new Set(deals.map((d) => d.key));
+    const fresh = deals.filter((d) => !seenDeals.has(d.key));
+    // al abrir la página, lo que ya estaba no se marca como "Nueva": solo lo que aparezca después
+    fresh.forEach((d) => seenDeals.set(d.key, dealsReady ? now : now - 3600));
+    [...seenDeals.keys()].forEach((k) => { if (!current_.has(k)) seenDeals.delete(k); });
+    store.set("mercadillo-deals-seen", JSON.stringify(Object.fromEntries(seenDeals)));
+    if (dealsReady && fresh.length) {        // en la primera carga no se avisa de todo lo que ya había
+      if (document.hidden) { unseen += fresh.length; document.title = `(${unseen}) Mercadillo`; }
+      if (store.get("mercadillo-notify") === "1") notifyDeals(fresh);
+    }
+    dealsReady = true;
+  }
+  function notifyDeals(list) {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    const top = [...list].sort((a, b) => a.delta - b.delta)[0];
+    try {
+      new Notification(list.length === 1 ? "Nueva oportunidad en el Mercadillo" : `${list.length} oportunidades nuevas`,
+        { body: `${top.name} a ${fmt(top.price)} créditos (${Math.round(top.delta * 100)}% vs precio justo)`, tag: "mercadillo" });
+    } catch { /* algunos celulares no permiten avisos desde una página: queda el contador en el título */ }
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { unseen = 0; document.title = "Mercadillo"; } });
+
+  function renderLiveTab() {
+    const box = $("live-summary"), list = $("live-list");
+    if (!index.live) { box.innerHTML = `<div class="panel empty">Los precios en vivo no están activos en este sitio.</div>`; list.hidden = true; return; }
+    if (!live) { box.innerHTML = `<div class="panel empty">Conectando con los precios en vivo…</div>`; list.hidden = true; return; }
+    const now = Date.now() / 1000;
+    const checked = Object.values(live.items).filter((v) => v[2] + (now - live.t) <= LIVE_FRESH).length;
+    const deals = liveDeals().sort((a, b) => (seenDeals.get(b.key) || 0) - (seenDeals.get(a.key) || 0) || a.delta - b.delta);
+    const canNotify = "Notification" in window;
+    const on = store.get("mercadillo-notify") === "1" && canNotify && Notification.permission === "granted";
+    box.innerHTML = `<div class="panel live-top"><div>
+        <strong>${deals.length ? `${fmt(deals.length)} oportunidad${deals.length === 1 ? "" : "es"} ahora` : "Sin oportunidades en este momento"}</strong>
+        <span>${fmt(checked)} furnis confirmados en los últimos 15 min, actualizado hace ${agoShort(liveAge())}. Se refresca sola cada minuto.</span></div>
+        ${canNotify ? `<button class="btn ${on ? "ghost" : ""}" id="notify-btn">${on ? "Avisos activados" : "Avisarme"}</button>` : ""}</div>`;
+    const btn = $("notify-btn");
+    if (btn) btn.addEventListener("click", async () => {
+      if (on) { store.set("mercadillo-notify", "0"); renderLiveTab(); return; }
+      const perm = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+      if (perm === "granted") { store.set("mercadillo-notify", "1"); toast("Te avisaremos mientras esta página esté abierta."); }
+      else toast("El navegador no dio permiso para avisos. Puedes activarlo en su configuración.");
+      renderLiveTab();
+    });
+    const fee = Number(index.fee_pct ?? 1);
+    list.hidden = !deals.length;
+    list.innerHTML = deals.map((s) => {
+      const net = Math.round(s.fair * (1 - fee / 100) - s.price);
+      const isNew = now - (seenDeals.get(s.key) || 0) < 10 * 60;
+      const sub = `<div class="sub">${isNew ? '<span class="badge-new">Nueva</span>' : ""}Confirmado hace ${agoShort(now - s.liveAt)}. Precio justo ${fmt(s.fair)}, revenderlo deja <b>+${fmt(net)}</b></div>`;
+      return rowHtml(s, sub);
+    }).join("");
+    bindRows(list);
+  }
+
   // ---- radar ----
   let prediction = null, predictionLoading = null;
   function loadPrediction() {
@@ -766,7 +851,9 @@
     document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.view === name));
     $("list-view").hidden = name !== "market"; $("launches-view").hidden = name !== "launches"; $("budget-view").hidden = name !== "budget";
     $("radar-view").hidden = name !== "radar";
+    $("live-view").hidden = name !== "live";
     if (name === "radar") renderRadar();
+    if (name === "live") renderLiveTab();
     if (name === "launches") renderLaunches();
     if (name === "budget") renderBudget();
   }
@@ -800,7 +887,7 @@
     const inDetail = !!(key && index && index.items[key]);
     document.querySelector(".tabs").hidden = inDetail;
     $("detail-view").hidden = !inDetail;
-    if (inDetail) { ["list-view", "radar-view", "launches-view", "budget-view"].forEach((id) => { $(id).hidden = true; }); renderDetail(key); }
+    if (inDetail) { ["list-view", "live-view", "radar-view", "launches-view", "budget-view"].forEach((id) => { $(id).hidden = true; }); renderDetail(key); }
     else { current = null; showView(view); }
   }
   window.addEventListener("hashchange", route);
@@ -837,8 +924,10 @@
       live = data;
       all.forEach(applyLiveTo);
       paintMeta();
+      trackDeals();
       if (current) { applyLiveTo(current); paintSummary(current); }
       else if (view === "market") renderList();
+      else if (view === "live") renderLiveTab();
       else if (view === "launches") renderLaunches();
     } catch { /* si la máquina no responde, la página sigue con los datos publicados */ }
   }
@@ -859,6 +948,8 @@
       if (index.live) {
         loadLive();
         setInterval(loadLive, LIVE_EVERY);
+        setInterval(() => { if (view === "live" && !current) loadLive(); }, 60000); // en la pestaña En vivo, cada minuto
+        $("tab-live").hidden = false;
         setInterval(paintMeta, 15000);
         document.addEventListener("visibilitychange", () => { if (!document.hidden) loadLive(); });
       }
