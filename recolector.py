@@ -220,7 +220,10 @@ def run(site: Path, full_scan: bool) -> int:
         next_cursor = (cursor + size) % max(1, len(all_keys))
     today = datetime.now(TZ).date()
     # los furnis ya actualizados hoy no se vuelven a pedir si corres el workflow otra vez el mismo día
-    fresh_today = {k for k, v in items.items() if v.get("u") == today.isoformat()}
+    # versiones anteriores no guardaban la fecha por furni: si el índice se guardó hoy, esos también cuentan
+    index_day = (datetime.fromisoformat(index["updated"]).astimezone(TZ).date().isoformat()
+                 if index.get("updated") else None)
+    fresh_today = {k for k, v in items.items() if v.get("u", index_day) == today.isoformat()}
     priority = list(dict.fromkeys(list(targets) + [k for k in items if k not in fresh_today]))
     seen = set(priority) | fresh_today
     scan_items = [(i, k) for i, k in enumerate(scan) if k not in seen]  # i = posición desde el cursor
