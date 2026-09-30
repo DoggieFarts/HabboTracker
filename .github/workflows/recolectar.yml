@@ -2,7 +2,8 @@ name: Recolectar precios
 
 on:
   schedule:
-    - cron: "0 13 * * *"   # todos los días, 7:00 a. m. hora del centro de México
+    - cron: "0 13 * * *"   # 7:00 a. m. hora del centro de México
+    - cron: "0 1 * * *"    # 7:00 p. m. hora del centro de México
   workflow_dispatch:
     inputs:
       completo:
@@ -55,13 +56,4 @@ jobs:
       - name: Publicar la página
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cp index.html sitio/index.html
-          cd sitio
-          git init --quiet -b datos
-          git config user.name "mercadillo-bot"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit --quiet -m "Datos del $(date -u +%F)"
-          # la rama datos siempre tiene un solo commit, así el repo no crece cada día
-          git push --quiet --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" datos
+        run: bash publicar.sh "Datos del $(date -u '+%F %H:%M') UTC"
