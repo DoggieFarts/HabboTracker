@@ -22,7 +22,7 @@ concurrency:
 jobs:
   recolectar:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
 
@@ -52,6 +52,13 @@ jobs:
         continue-on-error: true   # si habboapi.site falla, la página se publica igual
         timeout-minutes: 35
         run: python -u historial.py --sitio sitio --minutos 30
+
+      - name: Calcular el radar
+        continue-on-error: true   # si falla, la página se publica igual
+        timeout-minutes: 10
+        run: |
+          pip install --quiet numpy
+          python -u prediccion.py --sitio sitio
 
       - name: Publicar la página
         env:
