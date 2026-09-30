@@ -112,6 +112,7 @@
            transition: opacity .2s; pointer-events: none; }
   .toast.show { opacity: 1; }
   [hidden] { display: none !important; }
+  .no-alerts .copy { display: none; }
 
   .toolbar { padding: 12px; display: grid; gap: 10px; }
   .toolbar .note { color: var(--slate); font-size: 13px; margin: 0; }
@@ -149,6 +150,9 @@
   .summary b { display: block; font: 600 24px/1.1 var(--display); } .summary span { color: var(--slate); font-size: 12.5px; }
   .picks .sub { white-space: normal; } .picks .sub b { color: var(--good); }
   .fine { color: var(--slate); font-size: 13px; margin: 10px 4px 0; }
+  .deals-cta { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 4px; }
+  .deals-cta div { flex: 1; min-width: 0; } .deals-cta strong { display: block; }
+  .deals-cta span { color: var(--slate); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -169,6 +173,11 @@
       <h3 class="section" style="margin-top:0">Tus avisos</h3>
       <div class="panel list alerts" id="alerts"></div>
     </section>
+
+    <div class="panel deals-cta">
+      <div><strong>Gangas en tu Telegram</strong><span>Te avisamos cuando algo muy vendido aparece muy por debajo de su precio justo.</span></div>
+      <button class="btn" id="deals-link">Activar</button>
+    </div>
 
     <h3 class="section" id="market-title">Todo el Mercadillo</h3>
     <div class="panel toolbar">
@@ -241,12 +250,12 @@
     </div>
     <div class="panel margin" id="margin"></div>
     <div class="panel aviso">
-      <p id="aviso-text">Pon el precio al que te gustaría comprarlo. Copia la línea y pégala en la lista de avisos.</p>
+      <p id="aviso-text">¿A qué precio te gustaría comprarlo? Te avisamos por Telegram cuando alguien lo venda a ese precio o menos.</p>
       <div class="line">
         <input class="field" id="aviso-price" type="number" inputmode="numeric" min="1" placeholder="Precio en créditos">
-        <button class="btn" id="aviso-copy">Copiar aviso</button>
+        <button class="btn" id="aviso-copy">Avisarme en Telegram</button>
       </div>
-      <a class="edit-link" id="edit-link" hidden target="_blank" rel="noopener">Abrir avisos.json en GitHub</a>
+      <p class="fine" id="aviso-note" style="margin:8px 0 0">Se abre Telegram con tu alerta lista: solo toca Iniciar. La confirmación llega en unos minutos.</p>
     </div>
   </section>
 </div>
@@ -293,7 +302,7 @@
   }
 
   function enrich(key, e) {
-    const target = (index.targets || {})[key] || 0;
+    const target = 0; // las alertas ahora son personales y viven en el bot de Telegram
     const fair = e.m || e.a || null;
     const delta = e.p && fair ? (e.p - fair) / fair : null;
     return { key, name: e.n, cls: e.c, kind: e.t, price: e.p, avg: e.a, fair, low: e.l, high: e.h,
@@ -363,7 +372,7 @@
       if (extra.length) html += `<div class="list-head"><span>Sin ventas en los últimos 30 días</span><span>${fmt(matches.length)}</span></div>`;
       html += extra.map(([n, c, t]) => `<div class="row inactive">${thumb(c)}<div class="left"><div class="name">${esc(n)}</div>
         <div class="sub">${esc(c)}, furni de ${kindName(t)}</div></div>
-        <button class="copy" data-line='${esc(JSON.stringify({ classname: c, tipo: kindName(t), precio: 0 }))}'>Copiar aviso</button></div>`).join("");
+        <button class="copy" data-key="${esc(`${t}:${c}`)}" data-name="${esc(n)}">Crear alerta</button></div>`).join("");
     }
     if (!html) html = `<div class="empty"><strong>Sin resultados</strong>Prueba con otra parte del nombre.</div>`;
     $("list").innerHTML = html;
@@ -407,10 +416,7 @@
     $("d-meta").textContent = `${s.cls} en ${index.hotel}, furni de ${kindName(s.kind)}` +
       (s.launched ? `, salió hace ${fmt(daysAgo(s.launched))} días` : "");
     paintSummary(s);
-    $("aviso-price").value = s.target || "";
-    $("aviso-text").textContent = s.target
-      ? `Tienes un aviso en ${fmt(s.target)} créditos. Para cambiarlo, copia la línea nueva y reemplaza la anterior en avisos.json.`
-      : "Pon el precio al que te gustaría comprarlo. Copia la línea y pégala en la lista de avisos.";
+    $("aviso-price").value = s.price ? Math.max(1, Math.round(Math.min(s.price, s.fair || s.price) * 0.9)) : "";
     $("chart").innerHTML = `<div class="empty">Cargando historial…</div>`;
     window.scrollTo(0, 0);
     try {
@@ -585,29 +591,32 @@
   }
 
   // ---- avisos ----
-  async function copyLine(obj) {
-    const text = JSON.stringify(obj).replace(/,"/g, ', "').replace(/":/g, '": ').replace(/^\{/, "{ ").replace(/\}$/, " }") + ",";
-    try { await navigator.clipboard.writeText(text); toast("Copiado. Pégalo dentro de la lista de avisos y guarda."); }
-    catch { prompt("Copia esta línea:", text); }
+  // el bot reconoce cada furni por los primeros 10 caracteres del SHA-1 de su clave
+  async function furniHash(key) {
+    const buf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(key));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 10);
+  }
+  async function openAlert(key, price) {
+    if (!index.bot) { toast("Las alertas todavía no están activas en este sitio."); return; }
+    const payload = `a_${await furniHash(key)}_${price}`;
+    window.open(`https://t.me/${encodeURIComponent(index.bot)}?start=${payload}`, "_blank", "noopener");
   }
   $("aviso-copy").addEventListener("click", () => {
     const price = parseInt($("aviso-price").value, 10);
     if (!current) return;
     if (!price || price < 1) { $("aviso-price").focus(); toast("Escribe primero el precio en créditos."); return; }
-    copyLine({ classname: current.cls, tipo: kindName(current.kind), precio: price });
+    openAlert(current.key, price);
   });
   $("list").addEventListener("click", (ev) => {
     const b = ev.target.closest(".copy"); if (!b) return;
     ev.stopPropagation();
-    const obj = JSON.parse(b.dataset.line);
-    const price = parseInt(prompt(`¿A qué precio quieres el aviso de ${obj.classname}?`, "") || "", 10);
-    if (price > 0) copyLine({ ...obj, precio: price });
+    const price = parseInt(prompt(`¿A qué precio quieres que te avisemos de ${b.dataset.name}?`, "") || "", 10);
+    if (price > 0) openAlert(b.dataset.key, price);
   });
-  const host = location.hostname;
-  if (host.endsWith(".github.io")) {
-    const owner = host.replace(".github.io", ""), repo = location.pathname.split("/").filter(Boolean)[0] || host;
-    const link = $("edit-link"); link.href = `https://github.com/${owner}/${repo}/edit/main/avisos.json`; link.hidden = false;
-  }
+  $("deals-link").addEventListener("click", () => {
+    if (!index.bot) { toast("Las alertas todavía no están activas en este sitio."); return; }
+    window.open(`https://t.me/${encodeURIComponent(index.bot)}?start=gangas`, "_blank", "noopener");
+  });
 
   // ---- lanzamientos ----
   function renderLaunches() {
@@ -724,6 +733,11 @@
       all = Object.entries(index.items || {}).map(([k, e]) => enrich(k, e));
       $("meta").textContent = `${index.hotel}, ${ago(index.updated)}`;
       $("market-title").textContent = `Todo el Mercadillo, ${fmt(all.length)} furnis con ventas`;
+      // sin bot configurado, las alertas por Telegram no se muestran
+      if (!index.bot) {
+        document.querySelectorAll(".deals-cta, .panel.aviso").forEach((el) => { el.hidden = true; });
+        document.body.classList.add("no-alerts");
+      }
       renderAlerts(); renderList(); route();
       if (all.some((s) => s.launched && daysAgo(s.launched) <= 3)) $("tab-launch-dot") && ($("tab-launch-dot").hidden = false);
     })

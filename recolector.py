@@ -375,6 +375,7 @@ def run(site: Path, full_scan: bool) -> int:
         "hotel": hotel, "fee_pct": config.get("comision_pct", 1),
         "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "targets": targets, "catalog_size": len(catalog), "items": items,
+        "bot": (config.get("telegram_bot") or "").lstrip("@") or None,
     })
     processed = max(0, done - len(priority))
     scanned = scan_items[processed - 1][0] + 1 if processed else 0  # posiciones del catálogo ya cubiertas

@@ -1,7 +1,11 @@
 {
   "hotel": "habbo.es",
   "comision_pct": 1,
-  "avisos": [
-    { "classname": "throne", "tipo": "piso", "precio": 950 }
-  ]
+  "telegram_bot": "",
+  "vigia": {
+    "descuento_minimo_pct": 15,
+    "ganancia_minima": 20,
+    "furnis": 200
+  },
+  "avisos": []
 }
