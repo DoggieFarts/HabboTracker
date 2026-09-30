@@ -49,6 +49,8 @@ PAUSE = 1.0                  # segundos entre peticiones, para no saturar la API
 SCAN_DAYS = 7                # el catálogo completo se revisa en esta cantidad de días
 CATALOG_MAX_AGE_DAYS = 7
 KEEP_DAYS = 365              # historial que se conserva por furni
+MAX_PAUSE = 12.0             # pausa máxima entre consultas cuando Habbo pide ir lento
+MAX_RETRIES = 6
 TIME_BUDGET_MIN = 45         # al pasar este tiempo se guarda lo avanzado y se sigue en la próxima corrida
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
               "Chrome/140.0 Safari/537.36 Mercadillo/2.0")
@@ -87,6 +89,15 @@ def save_json(path: Path, value) -> None:
 def to_int(value) -> int | None:
     try:
         return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def retry_after(e: urllib.error.HTTPError) -> int | None:
+    """Segundos que Habbo pide esperar, si los indica."""
+    value = e.headers.get("Retry-After") if e.headers is not None else None
+    try:
+        return max(1, min(600, int(value)))
     except (TypeError, ValueError):
         return None
 
@@ -212,11 +223,13 @@ def run(site: Path, full_scan: bool) -> int:
     queue = priority + [k for k in scan if k not in seen]
     started = time.monotonic()
     print(f"Consultando {len(queue):,} furnis ({len(items):,} activos, {len(scan):,} del catálogo, "
-          f"{len(targets)} con aviso). Tiempo estimado: {math.ceil(len(queue) / BATCH_SIZE * (PAUSE + 0.6) / 60)} min.")
+          f"{len(targets)} con aviso). Tiempo estimado: {math.ceil(len(queue) / BATCH_SIZE * (float(state.get('pause', PAUSE)) + 0.6) / 60)} min"
+          f" (máximo {TIME_BUDGET_MIN} por corrida).")
 
     base = HOTELS[hotel]
     today = datetime.now(TZ).date()
     done, found_total, stopped = 0, 0, False
+    pause, calm, rate_limited = float(state.get("pause", PAUSE)), 0, 0
     for start in range(0, len(queue), BATCH_SIZE):
         if time.monotonic() - started > TIME_BUDGET_MIN * 60:
             print(f"Se alcanzó el límite de {TIME_BUDGET_MIN:g} min; se guarda lo avanzado y la próxima corrida sigue.")
@@ -226,7 +239,7 @@ def run(site: Path, full_scan: bool) -> int:
         payload = {"roomItems": [{"item": k[5:]} for k in chunk if k.startswith("room:")],
                    "wallItems": [{"item": k[5:]} for k in chunk if k.startswith("wall:")]}
         result = None
-        for attempt in range(3):
+        for attempt in range(MAX_RETRIES):
             try:
                 result = request(f"{base}/api/public/marketplace/stats/batch", payload)
                 break
@@ -234,17 +247,22 @@ def run(site: Path, full_scan: bool) -> int:
                 if e.code == 403 and done == 0:
                     print(f"{hotel} respondió 403: su protección contra bots está bloqueando a GitHub.")
                     return 1
-                if e.code in (429, 500, 502, 503, 504) and attempt < 2:
-                    wait = 30 * (attempt + 1)
-                    print(f"{hotel} pidió ir más lento (error {e.code}); espero {wait} s.")
+                if e.code in (429, 500, 502, 503, 504) and attempt < MAX_RETRIES - 1:
+                    wait = retry_after(e) or min(300, 30 * 2 ** attempt)
+                    if e.code == 429:
+                        # Habbo pide ir más despacio: se aumenta la pausa y se queda así un rato
+                        pause, calm = min(MAX_PAUSE, pause * 1.6 + 0.5), 0
+                        rate_limited += 1
+                    print(f"{hotel} pidió ir más lento (error {e.code}); espero {wait} s y dejo "
+                          f"{pause:.1f} s entre consultas.")
                     time.sleep(wait)
                     continue
-                print(f"Error {e.code} de {hotel}; se guarda lo que ya se tenía.")
+                print(f"Error {e.code} de {hotel}; se guarda lo avanzado y la próxima corrida sigue.")
             except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
-                if attempt < 2:
-                    time.sleep(15)
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(15 * (attempt + 1))
                     continue
-                print(f"Fallo de conexión ({e}); se guarda lo que ya se tenía.")
+                print(f"Fallo de conexión ({e}); se guarda lo avanzado y la próxima corrida sigue.")
             break
         if result is None:
             stopped = True
@@ -271,8 +289,11 @@ def run(site: Path, full_scan: bool) -> int:
                           "a": to_int(stats.get("averagePrice")) or simple_avg, "s": sold30,
                           "o": to_int(stats.get("currentOpenOffers")), "sp": spark}
         done += len(chunk)
+        calm += 1
+        if calm >= 60 and pause > PAUSE:  # un buen rato sin quejas: se acelera un poco
+            pause, calm = max(PAUSE, pause * 0.85), 0
         if start + BATCH_SIZE < len(queue):
-            time.sleep(PAUSE)
+            time.sleep(pause)
         if done // 1000 > (done - len(chunk)) // 1000:
             mins = (time.monotonic() - started) / 60
             print(f"  {done:,} de {len(queue):,}  ({mins:.0f} min, {found_total:,} con ventas)")
@@ -293,10 +314,12 @@ def run(site: Path, full_scan: bool) -> int:
         resume = next_cursor
     swept = (int(state.get("swept", 0)) if state.get("partial") else 0) + scanned
     partial = bool(stopped and full_mode and swept < len(all_keys))
+    state["pause"] = round(pause, 2)  # la próxima corrida arranca al ritmo que funcionó
     state.update({"hotel": hotel, "cursor": resume, "partial": partial, "swept": swept if partial else 0,
                   "last_run": datetime.now(timezone.utc).isoformat(timespec="seconds")})
     save_json(site / "estado.json", state)
-    print(f"Listo: {done:,} consultados, {found_total:,} con datos, {len(items):,} furnis en la página.")
+    print(f"Listo: {done:,} consultados, {found_total:,} con datos, {len(items):,} furnis en la página. "
+          f"Habbo pidió ir lento {rate_limited} veces; pausa final {pause:.1f} s.")
 
     hits = [dict(v, key=k, target=targets[k]) for k, v in items.items()
             if k in targets and v.get("p") and v["p"] <= targets[k]]
