@@ -10,6 +10,14 @@ No tienes que elegir furnis. Cada día el recolector:
 
 La primera corrida revisa el catálogo entero de una vez, así que tarda más (unos 30 a 40 minutos).
 
+## Qué tiene la página
+
+- **Mercado:** todos los furnis con ventas. Cada uno muestra su **precio justo** (la mediana de 30 días, pesada por ventas), su rango normal y los **días para revender** (ofertas abiertas entre ventas por día).
+- **Lanzamientos:** furnis que aparecieron en el catálogo en los últimos 30 días y cuánto han bajado desde su precio más alto.
+- **Presupuesto:** pones cuántos créditos quieres invertir y en cuánto tiempo quieres revender, y arma una lista de compras con la ganancia estimada.
+
+Las imágenes de los furnis vienen de habboapi.site, un servicio externo. Si no carga alguna, la página sigue funcionando.
+
 ## Archivos
 
 - `avisos.json`: el único archivo que editas. Solo sirve para recibir avisos de precio.

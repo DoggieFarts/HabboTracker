@@ -47,7 +47,8 @@ TZ = ZoneInfo("America/Mexico_City")
 BATCH_SIZE = 20
 PAUSE = 1.0                  # segundos entre peticiones, para no saturar la API
 SCAN_DAYS = 7                # el catálogo completo se revisa en esta cantidad de días
-CATALOG_MAX_AGE_DAYS = 7
+CATALOG_MAX_AGE_DAYS = 1     # a diario, para detectar lanzamientos pronto
+LAUNCH_DAYS = 30             # días que un furni nuevo aparece en el radar de lanzamientos
 KEEP_DAYS = 365              # historial que se conserva por furni
 MAX_PAUSE = 12.0             # pausa máxima entre consultas cuando Habbo pide ir lento
 MAX_RETRIES = 6
@@ -131,8 +132,18 @@ def refresh_catalog(site: Path, hotel: str) -> list[list[str]]:
                 seen.add((kind, cls))
                 furnis.append([(f.get("name") or "").strip() or cls, cls, kind])
     furnis.sort(key=lambda x: (x[2], x[1]))
-    save_json(path, {"hotel": hotel, "updated": date.today().isoformat(), "furnis": furnis})
-    print(f"Catálogo actualizado: {len(furnis):,} furnis.")
+    previous = {f"{k}:{c}" for _, c, k in current.get("furnis", [])} if current.get("hotel") == hotel else set()
+    new_keys = [f"{k}:{c}" for _, c, k in furnis if f"{k}:{c}" not in previous] if previous else []
+    if len(new_keys) > 500:  # demasiados de golpe: casi seguro es un cambio del catálogo, no lanzamientos
+        new_keys = []
+    launches = load_json(site / "lanzamientos.json", {})
+    today = date.today().isoformat()
+    for key in new_keys:
+        launches.setdefault(key, today)
+    cutoff = (date.today() - timedelta(days=LAUNCH_DAYS * 2)).isoformat()
+    save_json(site / "lanzamientos.json", {k: d for k, d in launches.items() if d >= cutoff})
+    save_json(path, {"hotel": hotel, "updated": today, "furnis": furnis})
+    print(f"Catálogo actualizado: {len(furnis):,} furnis" + (f", {len(new_keys)} nuevos." if new_keys else "."))
     return furnis
 
 
@@ -161,18 +172,34 @@ def merge_history(site: Path, kind: str, cls: str, stats: dict, today: date) -> 
     return days
 
 
-def summarize(days: dict[str, list]) -> tuple[int, list[int], int | None]:
-    """Vendidos en 30 días, minigráfica y promedio simple, tomando como referencia el último día con ventas."""
+def weighted_percentile(pairs: list[tuple[int, int]], q: float) -> int | None:
+    """Percentil de precios diarios, pesado por cuántas piezas se vendieron ese día."""
+    pairs = sorted(p for p in pairs if p[0] and p[1])
+    total = sum(w for _, w in pairs)
+    if not total:
+        return None
+    acc = 0
+    for price, weight in pairs:
+        acc += weight
+        if acc >= q * total:
+            return price
+    return pairs[-1][0]
+
+
+def summarize(days: dict[str, list]) -> dict:
+    """Resumen de los últimos 30 días con ventas: volumen, minigráfica, precio justo y rango normal."""
     with_avg = [d for d, v in days.items() if v[0]]
     if not with_avg:
-        return 0, [], None
+        return {"sold": 0, "spark": [], "avg": None, "fair": None, "low": None, "high": None}
     last = date.fromisoformat(max(with_avg))
     since = (last - timedelta(days=29)).isoformat()
     recent = [v for d, v in sorted(days.items()) if d >= since]
     sold = sum(v[1] or 0 for v in recent)
     spark = [v[0] for v in recent if v[0]]
-    avg = round(sum(spark) / len(spark)) if spark else None
-    return sold, spark, avg
+    pairs = [(v[0], v[1]) for v in recent]
+    return {"sold": sold, "spark": spark, "avg": round(sum(spark) / len(spark)) if spark else None,
+            "fair": weighted_percentile(pairs, 0.5), "low": weighted_percentile(pairs, 0.25),
+            "high": weighted_percentile(pairs, 0.75)}
 
 
 # ---------------------------------------------------------------------------
@@ -197,6 +224,8 @@ def run(site: Path, full_scan: bool) -> int:
 
     catalog = refresh_catalog(site, hotel)
     names = {f"{k}:{c}": n for n, c, k in catalog}
+    launch_cut = (date.today() - timedelta(days=LAUNCH_DAYS)).isoformat()
+    launches = {k: d for k, d in load_json(site / "lanzamientos.json", {}).items() if d >= launch_cut}
 
     targets: dict[str, int] = {}
     for a in config.get("avisos", []):
@@ -224,7 +253,7 @@ def run(site: Path, full_scan: bool) -> int:
     index_day = (datetime.fromisoformat(index["updated"]).astimezone(TZ).date().isoformat()
                  if index.get("updated") else None)
     fresh_today = {k for k, v in items.items() if v.get("u", index_day) == today.isoformat()}
-    priority = list(dict.fromkeys(list(targets) + [k for k in items if k not in fresh_today]))
+    priority = list(dict.fromkeys(list(targets) + list(launches) + [k for k in items if k not in fresh_today]))
     seen = set(priority) | fresh_today
     scan_items = [(i, k) for i, k in enumerate(scan) if k not in seen]  # i = posición desde el cursor
     queue = priority + [k for _, k in scan_items]
@@ -295,19 +324,25 @@ def run(site: Path, full_scan: bool) -> int:
                 continue
             has_trades = any(to_int(h.get("totalSoldItems")) for h in stats.get("history") or [])
             current = to_int(stats.get("currentPrice"))
-            if not (has_trades or current or key in targets or key in items):
+            if not (has_trades or current or key in targets or key in items or key in launches):
                 continue  # nunca se ha vendido: no vale la pena guardarlo
             kind, cls = key.split(":", 1)
             days = merge_history(site, kind, cls, stats, today)
-            sold30, spark, simple_avg = summarize(days)
-            if sold30 == 0 and not current and key not in targets:
+            sm = summarize(days)
+            if sm["sold"] == 0 and not current and key not in targets and key not in launches:
                 items.pop(key, None)
                 continue
             found_total += 1
-            items[key] = {"n": names.get(key, cls), "c": cls, "t": kind, "p": current,
-                          "a": to_int(stats.get("averagePrice")) or simple_avg, "s": sold30,
-                          "o": to_int(stats.get("currentOpenOffers")), "sp": spark,
-                          "u": today.isoformat()}
+            offers = to_int(stats.get("currentOpenOffers"))
+            per_day = sm["sold"] / 30
+            entry = {"n": names.get(key, cls), "c": cls, "t": kind, "p": current,
+                     "a": to_int(stats.get("averagePrice")) or sm["avg"], "s": sm["sold"], "o": offers,
+                     "sp": sm["spark"], "m": sm["fair"], "l": sm["low"], "h": sm["high"],
+                     "dr": round(offers / per_day, 1) if offers is not None and per_day else None,
+                     "u": today.isoformat()}
+            if key in launches:
+                entry["f"] = launches[key]
+            items[key] = entry
         done += len(chunk)
         calm += 1
         if calm >= 60 and pause > PAUSE:  # un buen rato sin quejas: se acelera un poco
@@ -318,9 +353,12 @@ def run(site: Path, full_scan: bool) -> int:
             mins = (time.monotonic() - started) / 60
             print(f"  {done:,} de {len(queue):,}  ({mins:.0f} min, {found_total:,} con ventas)")
 
-    for key in targets:  # que los avisos sin datos aún aparezcan en la página
+    for key in list(targets) + list(launches):  # avisos y lanzamientos sin ventas también aparecen
+        if key in launches and key in items:
+            items[key]["f"] = launches[key]
         items.setdefault(key, {"n": names.get(key, key.split(":", 1)[1]), "c": key.split(":", 1)[1],
-                               "t": key.split(":", 1)[0], "p": None, "a": None, "s": 0, "o": None, "sp": []})
+                               "t": key.split(":", 1)[0], "p": None, "a": None, "s": 0, "o": None, "sp": [],
+                               **({"f": launches[key]} if key in launches else {})})
 
     save_json(site / "indice.json", {
         "hotel": hotel, "fee_pct": config.get("comision_pct", 1),

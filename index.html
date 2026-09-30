@@ -115,7 +115,7 @@
 
   .toolbar { padding: 12px; display: grid; gap: 10px; }
   .toolbar .note { color: var(--slate); font-size: 13px; margin: 0; }
-  .seg.full { display: flex; } .seg.full button { flex: 1; white-space: nowrap; padding: 6px 4px; }
+  .seg.full { display: flex; } .seg.full button { flex: 1; }
   .more { display: block; width: calc(100% - 12px); margin: 6px; padding: 11px; border: 1px dashed var(--line); border-radius: 7px;
           background: none; color: var(--pool); font-weight: 600; cursor: pointer; }
   .more:hover { background: var(--wash); }
@@ -128,6 +128,27 @@
   .btn:hover { background: #1C5A7E; }
   .inactive { opacity: .85; }
   .count { color: var(--slate); font-size: 12px; padding: 4px 12px 0; }
+
+  .tabs { display: flex; gap: 2px; background: var(--paper); border: 1px solid var(--line); border-radius: 9px; padding: 3px; margin: 0 0 14px; }
+  .tabs button { flex: 1; background: none; border: 1px solid transparent; border-radius: 7px; padding: 8px 4px; font-weight: 600;
+                 color: var(--slate); cursor: pointer; white-space: nowrap; font-size: 14px; }
+  .tabs button[aria-selected="true"] { background: var(--pool-soft); color: var(--pool); }
+  .row { grid-template-columns: 38px 1fr auto; }
+  .row.with-spark { grid-template-columns: 38px 1fr 64px auto; }
+  .row .thumb, .thumb-slot { grid-row: span 2; width: 38px; height: 38px; }
+  .thumb { object-fit: contain; image-rendering: pixelated; }
+  @media (max-width: 440px) { .row .spark { display: none; } .row.with-spark { grid-template-columns: 38px 1fr auto; } }
+  .seg.full button { white-space: nowrap; padding: 6px 4px; }
+  .detail-head { display: flex; gap: 14px; align-items: center; }
+  .detail-head .big-thumb { width: 64px; height: 64px; object-fit: contain; image-rendering: pixelated; flex: none; }
+  .budget { padding: 14px; display: grid; gap: 10px; }
+  .budget label { font-weight: 600; font-size: 14px; }
+  .budget .line { display: flex; gap: 8px; } .budget .line .field { flex: 1; min-width: 0; }
+  .summary { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 12px; }
+  .summary div { padding: 12px 14px; } .summary div + div { border-left: 1px solid var(--line); }
+  .summary b { display: block; font: 600 24px/1.1 var(--display); } .summary span { color: var(--slate); font-size: 12.5px; }
+  .picks .sub { white-space: normal; } .picks .sub b { color: var(--good); }
+  .fine { color: var(--slate); font-size: 13px; margin: 10px 4px 0; }
 </style>
 </head>
 <body>
@@ -136,6 +157,12 @@
     <h1 class="wordmark"><svg class="coin" style="width:16px;height:16px" viewBox="0 0 5 5" shape-rendering="crispEdges"><path fill="#8C5E06" d="M1 0h3v5H1zM0 1h5v3H0z"/><path fill="#D6961A" d="M1 1h3v3H1z"/><path fill="#F6D46B" d="M1 1h1v1H1z"/></svg>Mercadillo</h1>
     <div class="meta" id="meta">Cargando…</div>
   </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-view="market" aria-selected="true">Mercado</button>
+    <button role="tab" data-view="launches" aria-selected="false">Lanzamientos<span id="tab-launch-dot" hidden style="display:inline-block;width:7px;height:7px;background:var(--gold);margin-left:6px;vertical-align:2px"></span></button>
+    <button role="tab" data-view="budget" aria-selected="false">Presupuesto</button>
+  </nav>
 
   <main id="list-view">
     <section id="alerts-wrap" hidden>
@@ -156,20 +183,42 @@
     <div class="panel list" id="list" style="margin-top:12px"></div>
   </main>
 
+  <section id="launches-view" hidden>
+    <p class="fine" style="margin-top:0">Furnis que aparecieron en el catálogo en los últimos 30 días. Muchos bajan después de los primeros días: compara la oferta de hoy con su máximo.</p>
+    <div class="panel list" id="launches" style="margin-top:10px"></div>
+  </section>
+
+  <section id="budget-view" hidden>
+    <div class="panel budget">
+      <label for="budget">¿Cuántos créditos quieres invertir?</label>
+      <div class="line">
+        <input class="field" id="budget" type="number" inputmode="numeric" min="1" placeholder="Por ejemplo 1500">
+        <button class="btn" id="budget-go">Armar lista</button>
+      </div>
+      <label>¿En cuánto tiempo quieres poder revenderlos?</label>
+      <div class="seg full" id="budget-days">
+        <button data-days="3" aria-pressed="false">3 días</button>
+        <button data-days="7" aria-pressed="true">1 semana</button>
+        <button data-days="14" aria-pressed="false">2 semanas</button>
+      </div>
+    </div>
+    <div id="budget-out"></div>
+  </section>
+
   <section id="detail-view" hidden>
     <button class="back" id="back">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 3 5 8l5 5"/></svg>Volver
     </button>
     <div class="panel">
       <div class="detail-head">
-        <h2 id="d-name"></h2>
-        <div class="meta" id="d-meta"></div>
+        <img class="big-thumb" id="d-img" alt="">
+        <div><h2 id="d-name"></h2><div class="meta" id="d-meta"></div></div>
       </div>
       <div class="stats">
         <div class="stat low"><b id="s-low">–</b><span>Oferta más baja ahora</span></div>
-        <div class="stat"><b id="s-avg">–</b><span>Promedio, 30 días</span></div>
-        <div class="stat"><b id="s-sold">–</b><span>Vendidos en 30 días</span></div>
-        <div class="stat"><b id="s-offers">–</b><span>Ofertas abiertas</span></div>
+        <div class="stat"><b id="s-fair">–</b><span>Precio justo</span></div>
+        <div class="stat"><b id="s-day">–</b><span>Vendidos por día</span></div>
+        <div class="stat"><b id="s-dr">–</b><span>Días para revender</span></div>
       </div>
     </div>
     <div class="insight" id="insight"><strong></strong><span></span></div>
@@ -179,6 +228,7 @@
           <span><i style="width:16px;height:3px;background:var(--gold)"></i>Promedio</span>
           <span><i style="width:7px;height:7px;background:var(--pool)"></i>Oferta más baja</span>
           <span><i style="width:5px;height:10px;background:var(--bars)"></i>Vendidos</span>
+          <span><i style="width:12px;height:9px;background:#E3EEF5;border:1px solid #BCD3E2"></i>Rango normal</span>
         </div>
         <div class="seg" id="range">
           <button data-days="7" aria-pressed="false">7 d</button>
@@ -217,12 +267,18 @@
   const kindName = (t) => t === "wall" ? "pared" : "piso";
   const COIN = '<svg class="coin" viewBox="0 0 5 5" shape-rendering="crispEdges"><path fill="#8C5E06" d="M1 0h3v5H1zM0 1h5v3H0z"/><path fill="#D6961A" d="M1 1h3v3H1z"/><path fill="#F6D46B" d="M1 1h1v1H1z"/></svg>';
   const SORT_NOTES = {
-    deals: "Más baratos que su promedio de 30 días, entre los que se venden al menos una vez al día.",
+    deals: "Más baratos que su precio justo (la mediana de 30 días), entre los que se venden al menos una vez al día y se pueden revender en menos de un mes.",
     volume: "Los que más se venden: son los más fáciles de revender.",
-    pricey: "Más caros que su promedio, entre los que se venden seguido. Buen momento para vender si tienes uno.",
+    pricey: "Más caros que su precio justo, entre los que se venden seguido. Buen momento para vender si tienes uno.",
   };
 
   let index = null, all = [], catalog = null, sortMode = "deals", shown = PAGE, current = null, rangeDays = 30;
+  let view = "market", budgetDays = 7;
+  const IMG = (cls) => `https://habboapi.site/api/image/${encodeURIComponent(cls)}`;
+  const thumb = (cls) => `<img class="thumb" loading="lazy" alt="" src="${IMG(cls)}" onerror="this.style.visibility='hidden'">`;
+  const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+                  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+  const daysAgo = (iso) => Math.max(0, Math.floor((Date.now() - parseDay(iso)) / 86400000));
 
   function toast(text) {
     const t = $("toast"); t.textContent = text; t.classList.add("show");
@@ -238,15 +294,17 @@
 
   function enrich(key, e) {
     const target = (index.targets || {})[key] || 0;
-    const delta = e.p && e.a ? (e.p - e.a) / e.a : null;
-    return { key, name: e.n, cls: e.c, kind: e.t, price: e.p, avg: e.a, sold: e.s || 0, offers: e.o,
+    const fair = e.m || e.a || null;
+    const delta = e.p && fair ? (e.p - fair) / fair : null;
+    return { key, name: e.n, cls: e.c, kind: e.t, price: e.p, avg: e.a, fair, low: e.l, high: e.h,
+             sold: e.s || 0, perDay: (e.s || 0) / 30, offers: e.o, dr: e.dr ?? null, launched: e.f || null,
              spark: e.sp || [], target, delta, hit: !!(target && e.p && e.p <= target) };
   }
   function deltaText(d) {
     if (d == null) return { cls: "flat", text: "", short: "" };
     const cls = d <= -0.05 ? "down" : d >= 0.05 ? "up" : "flat";
     const pct = `${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.abs(d * 100).toFixed(0)}%`;
-    return { cls, text: `${pct} vs promedio`, short: pct };
+    return { cls, text: `${pct} vs precio justo`, short: pct };
   }
   function sparkSvg(values) {
     if (values.length < 2) return "";
@@ -254,15 +312,17 @@
     const pts = values.map((v, i) => `${(w * i / (values.length - 1)).toFixed(1)},${(h - 2 - (h - 4) * (v - lo) / span).toFixed(1)}`);
     return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts.join(" ")}" fill="none" stroke="#D6961A" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
   }
-  function rowHtml(s, subOverride) {
+  const perDayText = (s) => s.perDay >= 1 ? `${fmt(Math.round(s.perDay))} al día` : `${fmt(s.sold)} en 30 días`;
+  const drText = (s) => s.dr == null ? "" : s.dr < 1 ? ", se revende en horas" : `, ${fmt(Math.round(s.dr))} días para revender`;
+  function rowHtml(s, subOverride, rightOverride) {
     const d = deltaText(s.delta), spark = sparkSvg(s.spark);
     const sub = subOverride || (s.hit ? `<div class="sub hit">Llegó a tu aviso de ${fmt(s.target)}</div>`
-      : s.target ? `<div class="sub">Aviso en ${fmt(s.target)}, ${fmt(s.sold)} vendidos en 30 días</div>`
-      : `<div class="sub">${fmt(s.sold)} vendidos en 30 días</div>`);
-    return `<button class="row${spark ? " with-spark" : ""}" data-key="${esc(s.key)}">
+      : s.target ? `<div class="sub">Aviso en ${fmt(s.target)}, ${perDayText(s)}</div>`
+      : `<div class="sub">${perDayText(s)}${drText(s)}</div>`);
+    const right = rightOverride || `<div class="delta ${d.cls}" title="${d.text}">${d.short}</div>`;
+    return `<button class="row${spark ? " with-spark" : ""}" data-key="${esc(s.key)}">${thumb(s.cls)}
       <div class="left"><div class="name">${esc(s.name)}</div>${sub}</div>${spark}
-      <div><div class="price">${s.price ? COIN + fmt(s.price) : "–"}</div>
-      <div class="delta ${d.cls}" title="${d.text}">${d.short}</div></div></button>`;
+      <div><div class="price">${s.price ? COIN + fmt(s.price) : "–"}</div>${right}</div></button>`;
   }
   function bindRows(el) {
     el.querySelectorAll(".row[data-key]").forEach((b) => b.addEventListener("click", () => { location.hash = encodeURIComponent(b.dataset.key); }));
@@ -281,7 +341,7 @@
     let rows = all;
     if (q) rows = rows.filter((s) => norm(s.name).includes(q) || s.cls.toLowerCase().includes(q));
     const needVolume = !q;
-    if (sortMode === "deals") rows = rows.filter((s) => s.delta != null && (!needVolume || s.sold >= MIN_VOLUME)).sort((a, b) => a.delta - b.delta);
+    if (sortMode === "deals") rows = rows.filter((s) => s.delta != null && (!needVolume || (s.sold >= MIN_VOLUME && (s.dr == null || s.dr <= 30)))).sort((a, b) => a.delta - b.delta);
     else if (sortMode === "pricey") rows = rows.filter((s) => s.delta != null && (!needVolume || s.sold >= MIN_VOLUME)).sort((a, b) => b.delta - a.delta);
     else rows = [...rows].sort((a, b) => b.sold - a.sold);
     $("sort-note").textContent = q ? `${fmt(rows.length)} resultados con ventas recientes.` : SORT_NOTES[sortMode];
@@ -294,7 +354,7 @@
       const cat = await loadCatalog();
       const have = new Set(all.map((s) => s.key));
       const extra = cat.filter(([n, c, t]) => !have.has(`${t}:${c}`) && (norm(n).includes(q) || c.toLowerCase().includes(q))).slice(0, 10);
-      html += extra.map(([n, c, t]) => `<div class="row inactive"><div class="left"><div class="name">${esc(n)}</div>
+      html += extra.map(([n, c, t]) => `<div class="row inactive">${thumb(c)}<div class="left"><div class="name">${esc(n)}</div>
         <div class="sub">Sin ventas en los últimos 30 días, ${esc(c)}</div></div>
         <button class="copy" data-line='${esc(JSON.stringify({ classname: c, tipo: kindName(t), precio: 0 }))}'>Copiar aviso</button></div>`).join("");
     }
@@ -313,13 +373,20 @@
 
   // ---- detalle ----
   function insightFor(s) {
-    const perDay = s.sold / 30, d = s.delta, pct = d == null ? 0 : Math.abs(d * 100).toFixed(0);
-    if (d == null) return ["", "Sin oferta abierta ahora", "Nadie lo está vendiendo en este momento o todavía no hay promedio."];
+    const d = s.delta, pct = d == null ? 0 : Math.abs(d * 100).toFixed(0);
+    const slow = s.dr != null && s.dr > 14;
+    const drNote = s.dr == null ? "" : slow
+      ? ` Ojo: hay muchas ofertas abiertas para lo que se vende, podrías tardar unos ${fmt(Math.round(s.dr))} días en revenderlo.`
+      : ` Con ${fmt(s.offers)} ofertas abiertas, revenderlo tomaría unos ${fmt(Math.max(1, Math.round(s.dr)))} días.`;
+    if (!s.price) return ["", "Nadie lo está vendiendo ahora", s.fair ? `Su precio justo es de ${fmt(s.fair)} créditos.` : "Todavía no hay ventas suficientes para calcular su precio justo."];
     if (s.hit) return ["good", "Llegó a tu precio", `La oferta más baja es de ${fmt(s.price)} créditos y tu aviso está en ${fmt(s.target)}. Revisa el Mercadillo antes de que alguien más la tome.`];
-    if (d <= -0.10 && perDay >= 1) return ["good", `${pct}% más barato que su promedio`, `Se vende seguido (unas ${Math.round(perDay)} piezas al día), así que revenderlo cerca del promedio debería ser realista.`];
-    if (d <= -0.10) return ["", "Barato, pero se mueve poco", `Está ${pct}% abajo del promedio, aunque solo se vendieron ${fmt(s.sold)} en 30 días. Podrías tardar en revenderlo.`];
-    if (d >= 0.10) return ["bad", `${pct}% más caro que su promedio`, "No es buen momento para comprar. Si tienes uno, puede ser buen momento para venderlo."];
-    return ["", "En su rango normal", `La oferta más baja está a ${pct}% del promedio de 30 días. Nada urgente.`];
+    if (d == null) return ["", "Todavía sin precio justo", "Hace falta más historial de ventas para compararlo."];
+    const belowRange = s.low ? s.price < s.low : d <= -0.10, aboveRange = s.high ? s.price > s.high : d >= 0.10;
+    if (belowRange && s.perDay >= 1) return [slow ? "" : "good", `${pct}% abajo de su precio justo`,
+      `Está por debajo de su rango normal (${fmt(s.low)} a ${fmt(s.high)}) y se venden unas ${fmt(Math.round(s.perDay))} al día.` + drNote];
+    if (belowRange) return ["", "Barato, pero se mueve poco", `Está ${pct}% abajo de su precio justo, aunque solo se vendieron ${fmt(s.sold)} en 30 días.` + drNote];
+    if (aboveRange) return ["bad", `${pct}% arriba de su precio justo`, `Está por encima de su rango normal (${fmt(s.low)} a ${fmt(s.high)}). No es buen momento para comprar; si tienes uno, puede ser buen momento para venderlo.`];
+    return ["", "En su rango normal", `Su rango normal va de ${fmt(s.low)} a ${fmt(s.high)} créditos. Nada urgente.` + drNote];
   }
 
   async function renderDetail(key) {
@@ -328,19 +395,21 @@
     const s = enrich(key, e);
     current = { ...s, days: null };
     $("d-name").textContent = s.name;
-    $("d-meta").textContent = `${s.cls} en ${index.hotel}, furni de ${kindName(s.kind)}`;
+    const img = $("d-img"); img.style.visibility = "visible"; img.onerror = () => { img.style.visibility = "hidden"; }; img.src = IMG(s.cls);
+    $("d-meta").textContent = `${s.cls} en ${index.hotel}, furni de ${kindName(s.kind)}` +
+      (s.launched ? `, salió hace ${fmt(daysAgo(s.launched))} días` : "");
     $("s-low").textContent = fmt(s.price);
-    $("s-avg").textContent = fmt(s.avg);
-    $("s-sold").textContent = fmt(s.sold);
-    $("s-offers").textContent = fmt(s.offers);
+    $("s-fair").textContent = fmt(s.fair);
+    $("s-day").textContent = s.perDay >= 1 ? fmt(Math.round(s.perDay)) : s.sold ? (s.perDay).toFixed(1) : "0";
+    $("s-dr").textContent = s.dr == null ? "–" : s.dr < 1 ? "<1" : fmt(Math.round(s.dr));
     const [tone, head, body] = insightFor(s);
     const box = $("insight"); box.className = "insight " + tone;
     box.querySelector("strong").textContent = head; box.querySelector("span").textContent = body;
     const fee = Number(index.fee_pct ?? 1);
-    if (s.price && s.avg) {
-      const net = Math.round(s.avg * (1 - fee / 100) - s.price);
-      $("margin").innerHTML = `Si compras a ${fmt(s.price)} y revendes al promedio (${fmt(s.avg)}), te quedan <b class="${net >= 0 ? "pos" : "neg"}">${net >= 0 ? "+" : "−"}${fmt(Math.abs(net))}</b> créditos netos con ${fee}% de comisión.`;
-    } else $("margin").textContent = "El margen aparece cuando hay una oferta abierta y un promedio.";
+    if (s.price && s.fair) {
+      const net = Math.round(s.fair * (1 - fee / 100) - s.price);
+      $("margin").innerHTML = `Si compras a ${fmt(s.price)} y revendes a su precio justo (${fmt(s.fair)}), te quedan <b class="${net >= 0 ? "pos" : "neg"}">${net >= 0 ? "+" : "−"}${fmt(Math.abs(net))}</b> créditos netos con ${fee}% de comisión.`;
+    } else $("margin").textContent = "El margen aparece cuando hay una oferta abierta y un precio justo.";
     $("aviso-price").value = s.target || "";
     $("aviso-text").textContent = s.target
       ? `Tienes un aviso en ${fmt(s.target)} créditos. Para cambiarlo, copia la línea nueva y reemplaza la anterior en avisos.json.`
@@ -376,6 +445,7 @@
     const values = pts.flatMap((p) => [p.avg, p.low]).filter(Boolean);
     if (s.target) values.push(s.target);
     if (!values.length) { host.innerHTML = `<div class="empty">No hay ventas en este periodo.</div>`; return; }
+    if (s.low && s.high) values.push(s.low, s.high);
 
     const W = host.clientWidth || 600, H = Math.round(Math.min(300, Math.max(220, W * 0.55)));
     const L = 46, R = 10, T = 12, B = 24, VOL = 38, GAP = 10;
@@ -394,6 +464,9 @@
     const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(plotW / 64))));
     for (let i = 0; i < n; i += every)
       svg += `<text x="${L + w * i + w / 2}" y="${H - 6}" text-anchor="middle" font-size="11" fill="#5B6B7A">${fmtDay(pts[i].day)}</text>`;
+    if (s.low && s.high) {
+      svg += `<rect x="${L}" y="${y(s.high)}" width="${plotW}" height="${Math.max(1, y(s.low) - y(s.high))}" fill="#E3EEF5" opacity=".75"/>`;
+    }
     const maxSold = Math.max(1, ...pts.map((p) => p.sold)), bw = Math.max(1, w * 0.62);
     pts.forEach((p, i) => {
       if (!p.sold) return;
@@ -470,6 +543,85 @@
     const link = $("edit-link"); link.href = `https://github.com/${owner}/${repo}/edit/main/avisos.json`; link.hidden = false;
   }
 
+  // ---- lanzamientos ----
+  function renderLaunches() {
+    const rows = all.filter((s) => s.launched).sort((a, b) => b.launched.localeCompare(a.launched) || b.sold - a.sold);
+    if (!rows.length) {
+      $("launches").innerHTML = `<div class="empty"><strong>Todavía no hay lanzamientos</strong>El radar compara el catálogo de cada día con el anterior, así que detecta furnis nuevos a partir de mañana.</div>`;
+      return;
+    }
+    $("launches").innerHTML = rows.map((s) => {
+      const age = daysAgo(s.launched);
+      const when = age <= 0 ? "Salió hoy" : age === 1 ? "Salió ayer" : `Salió hace ${age} días`;
+      const sub = `<div class="sub">${when}, ${s.sold ? `${fmt(s.sold)} vendidos` : "aún sin ventas"}</div>`;
+      const peak = s.spark.length ? Math.max(...s.spark) : null;
+      let right = `<div class="delta flat">${s.price ? "" : "sin ofertas"}</div>`;
+      if (peak && s.price) {
+        const d = (s.price - peak) / peak;
+        right = d < -0.02 ? `<div class="delta down" title="Comparado con el día más caro desde que salió">−${Math.abs(Math.round(d * 100))}% vs máximo</div>`
+                          : `<div class="delta up">en su máximo</div>`;
+      }
+      return rowHtml(s, sub, right);
+    }).join("");
+    bindRows($("launches"));
+  }
+
+  // ---- presupuesto ----
+  function renderBudget() {
+    const budget = parseInt($("budget").value, 10), out = $("budget-out");
+    if (!budget || budget < 1) { out.innerHTML = ""; return; }
+    store.set("mercadillo-budget", String(budget));
+    const fee = Number(index.fee_pct ?? 1);
+    const cands = all.map((s) => {
+      const net = s.price && s.fair ? Math.round(s.fair * (1 - fee / 100) - s.price) : 0;
+      return { ...s, net, roi: s.price ? net / s.price : 0 };
+    }).filter((s) => !(s.launched && daysAgo(s.launched) < 14)) // recién lanzados: su precio todavía se está acomodando
+      .filter((s) => s.price && s.price <= budget && s.perDay >= 1 && s.dr != null && s.dr <= budgetDays && s.net >= 2 && s.roi >= 0.03)
+      .sort((a, b) => b.roi - a.roi || b.perDay - a.perDay);
+    const picks = []; let left = budget;
+    for (const c of cands) {
+      if (picks.length >= 10) break;
+      if (c.price <= left) { picks.push(c); left -= c.price; }
+    }
+    if (!picks.length) {
+      out.innerHTML = `<div class="panel empty" style="margin-top:12px"><strong>Nada convence por ahora</strong>Ningún furni que quepa en tu presupuesto está por debajo de su precio justo y se revende en ${budgetDays} días o menos. Prueba con más tiempo de reventa o revisa mañana.</div>`;
+      return;
+    }
+    const spent = budget - left, profit = picks.reduce((a, p) => a + p.net, 0);
+    out.innerHTML = `<div class="panel summary">
+        <div><b>${fmt(spent)}</b><span>Inviertes</span></div>
+        <div><b class="down">+${fmt(profit)}</b><span>Ganancia estimada</span></div>
+        <div><b>${fmt(left)}</b><span>Te sobran</span></div></div>
+      <div class="panel list picks" style="margin-top:12px">${picks.map((p) => rowHtml(p,
+        `<div class="sub">Vende a ${fmt(p.fair)}: <b>+${fmt(p.net)}</b> (${Math.round(p.roi * 100)}%), ~${fmt(Math.max(1, Math.round(p.dr)))} días</div>`,
+        `<div class="delta down">${Math.round(p.delta * 100)}%</div>`)).join("")}</div>
+      <p class="fine">Es una estimación con los precios de la última actualización: la oferta más baja puede ya no estar, y vender a su precio justo puede tomar los días indicados. La ganancia ya descuenta ${fee}% de comisión.</p>`;
+    bindRows(out);
+  }
+  $("budget-go").addEventListener("click", renderBudget);
+  $("budget").addEventListener("keydown", (ev) => { if (ev.key === "Enter") renderBudget(); });
+  $("budget-days").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    budgetDays = Number(b.dataset.days);
+    $("budget-days").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", x === b));
+    renderBudget();
+  });
+  $("budget").value = store.get("mercadillo-budget") || "";
+
+  // ---- pestañas ----
+  function showView(name) {
+    view = name;
+    document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.view === name));
+    $("list-view").hidden = name !== "market"; $("launches-view").hidden = name !== "launches"; $("budget-view").hidden = name !== "budget";
+    if (name === "launches") renderLaunches();
+    if (name === "budget") renderBudget();
+  }
+  document.querySelector(".tabs").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (location.hash) location.hash = "";
+    showView(b.dataset.view);
+  });
+
   // ---- controles ----
   $("sort").addEventListener("click", (ev) => {
     const b = ev.target.closest("button"); if (!b) return;
@@ -492,8 +644,10 @@
   function route() {
     const key = decodeURIComponent(location.hash.slice(1));
     const inDetail = !!(key && index && index.items[key]);
-    $("list-view").hidden = inDetail; $("detail-view").hidden = !inDetail;
-    if (inDetail) renderDetail(key); else current = null;
+    document.querySelector(".tabs").hidden = inDetail;
+    $("detail-view").hidden = !inDetail;
+    if (inDetail) { ["list-view", "launches-view", "budget-view"].forEach((id) => { $(id).hidden = true; }); renderDetail(key); }
+    else { current = null; showView(view); }
   }
   window.addEventListener("hashchange", route);
 
@@ -505,6 +659,7 @@
       $("meta").textContent = `${index.hotel}, ${ago(index.updated)}`;
       $("market-title").textContent = `Todo el Mercadillo, ${fmt(all.length)} furnis con ventas`;
       renderAlerts(); renderList(); route();
+      if (all.some((s) => s.launched && daysAgo(s.launched) <= 3)) $("tab-launch-dot") && ($("tab-launch-dot").hidden = false);
     })
     .catch(() => {
       $("meta").textContent = "sin datos";
