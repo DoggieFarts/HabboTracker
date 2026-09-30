@@ -112,6 +112,9 @@
            transition: opacity .2s; pointer-events: none; }
   .toast.show { opacity: 1; }
   [hidden] { display: none !important; }
+  .live-dot { display: inline-block; width: 8px; height: 8px; background: var(--good); margin-right: 6px; vertical-align: 1px; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
   .no-alerts .copy { display: none; }
 
   .toolbar { padding: 12px; display: grid; gap: 10px; }
@@ -410,6 +413,7 @@
     const e = index.items[key];
     if (!e) { location.hash = ""; return; }
     const s = enrich(key, e);
+    applyLiveTo(s);
     current = { ...s, days: null };
     $("d-name").textContent = s.name;
     const img = $("d-img"); img.style.visibility = "visible"; img.onerror = () => { img.style.visibility = "hidden"; }; img.src = IMG(s.cls);
@@ -456,6 +460,8 @@
 
   function paintSummary(s) {
     $("s-low").textContent = fmt(s.price);
+    $("s-low").nextElementSibling.textContent = s.liveAt
+      ? `Oferta más baja, en vivo hace ${agoShort(Date.now() / 1000 - s.liveAt)}` : "Oferta más baja ahora";
     $("s-fair").textContent = fmt(s.fair);
     $("s-day").textContent = s.perDay >= 1 ? fmt(Math.round(s.perDay)) : s.sold ? (s.perDay).toFixed(1) : "0";
     $("s-dr").textContent = s.dr == null ? "–" : s.dr < 1 ? "<1" : fmt(Math.round(s.dr));
@@ -726,6 +732,44 @@
   }
   window.addEventListener("hashchange", route);
 
+
+  // ---- precios en vivo (máquina de Azure) ----
+  let live = null;
+  const LIVE_EVERY = 120000; // cada 2 minutos, solo con la pestaña visible
+  const liveAge = () => live ? Math.max(0, Date.now() / 1000 - live.t) : null;
+  const agoShort = (sec) => sec < 60 ? `${Math.max(1, Math.round(sec))} s` : sec < 3600 ? `${Math.round(sec / 60)} min` : `${Math.round(sec / 3600)} h`;
+  function paintMeta() {
+    const a = liveAge();
+    if (live && a < 600) $("meta").innerHTML = `<span class="live-dot"></span>${esc(index.hotel)}, en vivo hace ${agoShort(a)}`;
+    else $("meta").textContent = `${index.hotel}, ${ago(index.updated)}`;
+  }
+  function applyLiveTo(s) {
+    const v = live && live.items && live.items[s.key];
+    if (!v) return false;
+    const [p, o, age] = v;
+    s.price = p || null;
+    if (o != null) s.offers = o;
+    s.delta = s.price && s.fair ? (s.price - s.fair) / s.fair : null;
+    if (o != null && s.sold) s.dr = Math.round(o / (s.sold / 30) * 10) / 10;
+    s.liveAt = live.t - age;
+    return true;
+  }
+  async function loadLive() {
+    if (!index || !index.live || document.hidden) return;
+    try {
+      const r = await fetch(index.live, { cache: "no-store" });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (live && data.t === live.t) { paintMeta(); return; }
+      live = data;
+      all.forEach(applyLiveTo);
+      paintMeta();
+      if (current) { applyLiveTo(current); paintSummary(current); }
+      else if (view === "market") renderList();
+      else if (view === "launches") renderLaunches();
+    } catch { /* si la máquina no responde, la página sigue con los datos publicados */ }
+  }
+
   fetch(`indice.json?t=${Date.now()}`)
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then((json) => {
@@ -739,6 +783,12 @@
         document.body.classList.add("no-alerts");
       }
       renderAlerts(); renderList(); route();
+      if (index.live) {
+        loadLive();
+        setInterval(loadLive, LIVE_EVERY);
+        setInterval(paintMeta, 15000);
+        document.addEventListener("visibilitychange", () => { if (!document.hidden) loadLive(); });
+      }
       if (all.some((s) => s.launched && daysAgo(s.launched) <= 3)) $("tab-launch-dot") && ($("tab-launch-dot").hidden = false);
     })
     .catch(() => {

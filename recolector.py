@@ -376,6 +376,7 @@ def run(site: Path, full_scan: bool) -> int:
         "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "targets": targets, "catalog_size": len(catalog), "items": items,
         "bot": (config.get("telegram_bot") or "").lstrip("@") or None,
+        "live": (config.get("en_vivo_url") or "").strip() or None,
     })
     processed = max(0, done - len(priority))
     scanned = scan_items[processed - 1][0] + 1 if processed else 0  # posiciones del catálogo ya cubiertas
