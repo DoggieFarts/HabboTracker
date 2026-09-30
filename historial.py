@@ -128,7 +128,7 @@ def main() -> int:
         days_added += merge(site, kind, cls, history)
         done[key] = date.today().isoformat()
         processed += 1
-        if processed % 100 == 0:
+        if processed % 50 == 0:  # unos 2 minutos entre mensajes
             save_json(state_path, state)  # por si la corrida se corta, no se repite lo ya hecho
             print(f"  {processed:,} furnis, {days_added:,} días agregados ({(time.monotonic() - started) / 60:.0f} min)")
         time.sleep(PAUSE)
