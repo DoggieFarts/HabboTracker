@@ -172,7 +172,7 @@
 
     <h3 class="section" id="market-title">Todo el Mercadillo</h3>
     <div class="panel toolbar">
-      <input class="field" id="q" type="search" placeholder="Busca un furni por nombre" autocomplete="off">
+      <input class="field" id="q" type="search" placeholder="Busca entre todos los furnis del hotel" autocomplete="off">
       <div class="seg full" id="sort">
         <button data-sort="deals" aria-pressed="true">Oportunidades</button>
         <button data-sort="volume" aria-pressed="false">Más vendidos</button>
@@ -267,7 +267,7 @@
   const kindName = (t) => t === "wall" ? "pared" : "piso";
   const COIN = '<svg class="coin" viewBox="0 0 5 5" shape-rendering="crispEdges"><path fill="#8C5E06" d="M1 0h3v5H1zM0 1h5v3H0z"/><path fill="#D6961A" d="M1 1h3v3H1z"/><path fill="#F6D46B" d="M1 1h1v1H1z"/></svg>';
   const SORT_NOTES = {
-    deals: "Más baratos que su precio justo (la mediana de 30 días), entre los que se venden al menos una vez al día y se pueden revender en menos de un mes.",
+    deals: "Más baratos que su precio justo (la mediana de 30 días), entre los que se venden al menos una vez al día, se pueden revender en menos de un mes y dejan al menos 3 créditos de diferencia.",
     volume: "Los que más se venden: son los más fáciles de revender.",
     pricey: "Más caros que su precio justo, entre los que se venden seguido. Buen momento para vender si tienes uno.",
   };
@@ -297,7 +297,9 @@
     const fair = e.m || e.a || null;
     const delta = e.p && fair ? (e.p - fair) / fair : null;
     return { key, name: e.n, cls: e.c, kind: e.t, price: e.p, avg: e.a, fair, low: e.l, high: e.h,
-             sold: e.s || 0, perDay: (e.s || 0) / 30, offers: e.o, dr: e.dr ?? null, launched: e.f || null,
+             sold: e.s || 0, perDay: (e.s || 0) / 30, offers: e.o,
+             // furnis guardados por versiones anteriores no traen "dr": se calcula aquí con ofertas y ventas
+             dr: e.dr ?? (e.o != null && e.s ? Math.round(e.o / (e.s / 30) * 10) / 10 : null), launched: e.f || null,
              spark: e.sp || [], target, delta, hit: !!(target && e.p && e.p <= target) };
   }
   function deltaText(d) {
@@ -313,7 +315,8 @@
     return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts.join(" ")}" fill="none" stroke="#D6961A" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
   }
   const perDayText = (s) => s.perDay >= 1 ? `${fmt(Math.round(s.perDay))} al día` : `${fmt(s.sold)} en 30 días`;
-  const drText = (s) => s.dr == null ? "" : s.dr < 1 ? ", se revende en horas" : `, ${fmt(Math.round(s.dr))} días para revender`;
+  const drText = (s) => s.dr == null ? "" : s.dr < 1 ? ", se revende en horas"
+    : Math.round(s.dr) === 1 ? ", 1 día para revender" : `, ${fmt(Math.round(s.dr))} días para revender`;
   function rowHtml(s, subOverride, rightOverride) {
     const d = deltaText(s.delta), spark = sparkSvg(s.spark);
     const sub = subOverride || (s.hit ? `<div class="sub hit">Llegó a tu aviso de ${fmt(s.target)}</div>`
@@ -341,21 +344,25 @@
     let rows = all;
     if (q) rows = rows.filter((s) => norm(s.name).includes(q) || s.cls.toLowerCase().includes(q));
     const needVolume = !q;
-    if (sortMode === "deals") rows = rows.filter((s) => s.delta != null && (!needVolume || (s.sold >= MIN_VOLUME && (s.dr == null || s.dr <= 30)))).sort((a, b) => a.delta - b.delta);
-    else if (sortMode === "pricey") rows = rows.filter((s) => s.delta != null && (!needVolume || s.sold >= MIN_VOLUME)).sort((a, b) => b.delta - a.delta);
+    // en furnis de 2 o 3 créditos, un crédito de diferencia parece un -50%: se ignoran esas diferencias mínimas
+    const meaningful = (s) => s.fair >= 10 && Math.abs(s.price - s.fair) >= 3;
+    if (sortMode === "deals") rows = rows.filter((s) => s.delta != null && (!needVolume || (s.sold >= MIN_VOLUME && meaningful(s) && (s.dr == null || s.dr <= 30)))).sort((a, b) => a.delta - b.delta);
+    else if (sortMode === "pricey") rows = rows.filter((s) => s.delta != null && (!needVolume || (s.sold >= MIN_VOLUME && meaningful(s)))).sort((a, b) => b.delta - a.delta);
     else rows = [...rows].sort((a, b) => b.sold - a.sold);
-    $("sort-note").textContent = q ? `${fmt(rows.length)} resultados con ventas recientes.` : SORT_NOTES[sortMode];
+    $("sort-note").textContent = q ? `${fmt(rows.length)} con ventas recientes. Abajo aparecen también los que no se han vendido.` : SORT_NOTES[sortMode];
 
     let html = rows.slice(0, shown).map((s) => rowHtml(s)).join("");
     if (rows.length > shown) html += `<button class="more" id="more">Ver ${Math.min(PAGE, rows.length - shown)} más de ${fmt(rows.length - shown)}</button>`;
 
-    // si buscas algo que casi no se vende, también se busca en el catálogo completo
-    if (q.length >= 2 && rows.length < 5) {
+    // al buscar, también se muestran los furnis del catálogo completo que no han tenido ventas
+    if (q.length >= 2) {
       const cat = await loadCatalog();
       const have = new Set(all.map((s) => s.key));
-      const extra = cat.filter(([n, c, t]) => !have.has(`${t}:${c}`) && (norm(n).includes(q) || c.toLowerCase().includes(q))).slice(0, 10);
+      const matches = cat.filter(([n, c, t]) => !have.has(`${t}:${c}`) && (norm(n).includes(q) || c.toLowerCase().includes(q)));
+      const extra = matches.slice(0, 15);
+      if (extra.length) html += `<div class="list-head"><span>Sin ventas en los últimos 30 días</span><span>${fmt(matches.length)}</span></div>`;
       html += extra.map(([n, c, t]) => `<div class="row inactive">${thumb(c)}<div class="left"><div class="name">${esc(n)}</div>
-        <div class="sub">Sin ventas en los últimos 30 días, ${esc(c)}</div></div>
+        <div class="sub">${esc(c)}, furni de ${kindName(t)}</div></div>
         <button class="copy" data-line='${esc(JSON.stringify({ classname: c, tipo: kindName(t), precio: 0 }))}'>Copiar aviso</button></div>`).join("");
     }
     if (!html) html = `<div class="empty"><strong>Sin resultados</strong>Prueba con otra parte del nombre.</div>`;
