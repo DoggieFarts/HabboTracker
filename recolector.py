@@ -218,16 +218,20 @@ def run(site: Path, full_scan: bool) -> int:
         cursor = cursor % max(1, len(all_keys))
         scan = (all_keys[cursor:] + all_keys[:cursor])[:size]
         next_cursor = (cursor + size) % max(1, len(all_keys))
-    priority = list(dict.fromkeys(list(targets) + list(items)))
-    seen = set(priority)
-    queue = priority + [k for k in scan if k not in seen]
+    today = datetime.now(TZ).date()
+    # los furnis ya actualizados hoy no se vuelven a pedir si corres el workflow otra vez el mismo día
+    fresh_today = {k for k, v in items.items() if v.get("u") == today.isoformat()}
+    priority = list(dict.fromkeys(list(targets) + [k for k in items if k not in fresh_today]))
+    seen = set(priority) | fresh_today
+    scan_items = [(i, k) for i, k in enumerate(scan) if k not in seen]  # i = posición desde el cursor
+    queue = priority + [k for _, k in scan_items]
     started = time.monotonic()
-    print(f"Consultando {len(queue):,} furnis ({len(items):,} activos, {len(scan):,} del catálogo, "
+    print(f"Consultando {len(queue):,} furnis ({len(priority):,} activos por actualizar, "
+          f"{len(fresh_today):,} ya actualizados hoy, {len(queue) - len(priority):,} nuevos del catálogo, "
           f"{len(targets)} con aviso). Tiempo estimado: {math.ceil(len(queue) / BATCH_SIZE * (float(state.get('pause', PAUSE)) + 0.6) / 60)} min"
           f" (máximo {TIME_BUDGET_MIN} por corrida).")
 
     base = HOTELS[hotel]
-    today = datetime.now(TZ).date()
     done, found_total, stopped = 0, 0, False
     pause, calm, rate_limited = float(state.get("pause", PAUSE)), 0, 0
     for start in range(0, len(queue), BATCH_SIZE):
@@ -287,7 +291,8 @@ def run(site: Path, full_scan: bool) -> int:
             found_total += 1
             items[key] = {"n": names.get(key, cls), "c": cls, "t": kind, "p": current,
                           "a": to_int(stats.get("averagePrice")) or simple_avg, "s": sold30,
-                          "o": to_int(stats.get("currentOpenOffers")), "sp": spark}
+                          "o": to_int(stats.get("currentOpenOffers")), "sp": spark,
+                          "u": today.isoformat()}
         done += len(chunk)
         calm += 1
         if calm >= 60 and pause > PAUSE:  # un buen rato sin quejas: se acelera un poco
@@ -307,7 +312,8 @@ def run(site: Path, full_scan: bool) -> int:
         "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "targets": targets, "catalog_size": len(catalog), "items": items,
     })
-    scanned = max(0, done - len(priority))
+    processed = max(0, done - len(priority))
+    scanned = scan_items[processed - 1][0] + 1 if processed else 0  # posiciones del catálogo ya cubiertas
     if stopped and all_keys:
         resume = (cursor + scanned) % len(all_keys)
     else:
