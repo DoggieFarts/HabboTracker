@@ -1,0 +1,58 @@
+name: Recolectar precios
+
+on:
+  schedule:
+    - cron: "0 13 * * *"   # todos los días, 7:00 a. m. hora del centro de México
+  workflow_dispatch:
+    inputs:
+      completo:
+        description: "Revisar todo el catálogo ahora (tarda más)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: recolectar
+  cancel-in-progress: false
+
+jobs:
+  recolectar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Traer los datos guardados
+        run: |
+          if git ls-remote --exit-code --heads origin datos > /dev/null; then
+            git clone --quiet --depth 1 --branch datos "https://github.com/${GITHUB_REPOSITORY}.git" sitio
+            rm -rf sitio/.git
+          else
+            mkdir sitio
+          fi
+
+      - name: Consultar el Mercadillo
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python recolector.py --sitio sitio ${{ inputs.completo && '--completo' || '' }}
+
+      - name: Publicar la página
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp index.html sitio/index.html
+          cd sitio
+          git init --quiet -b datos
+          git config user.name "mercadillo-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit --quiet -m "Datos del $(date -u +%F)"
+          # la rama datos siempre tiene un solo commit, así el repo no crece cada día
+          git push --quiet --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" datos
