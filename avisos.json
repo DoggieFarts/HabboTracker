@@ -1,0 +1,7 @@
+{
+  "hotel": "habbo.es",
+  "comision_pct": 1,
+  "avisos": [
+    { "classname": "throne", "tipo": "piso", "precio": 950 }
+  ]
+}
