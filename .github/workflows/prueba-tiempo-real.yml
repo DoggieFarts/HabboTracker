@@ -1,0 +1,30 @@
+name: Prueba de tiempo real
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Traer los datos guardados
+        timeout-minutes: 3
+        env:
+          GIT_TERMINAL_PROMPT: "0"
+        run: |
+          mkdir -p sitio
+          timeout 60 git fetch --quiet --depth 1 origin datos
+          git archive FETCH_HEAD | tar -x -C sitio
+
+      - name: Consultar 20 furnis cada minuto durante 15 minutos
+        run: python -u prueba_tiempo_real.py --sitio sitio
