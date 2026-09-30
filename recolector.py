@@ -52,6 +52,7 @@ LAUNCH_DAYS = 30             # días que un furni nuevo aparece en el radar de l
 KEEP_DAYS = 730              # historial que se conserva por furni (2 años, lo que da habboapi.site)
 MAX_PAUSE = 12.0             # pausa máxima entre consultas cuando Habbo pide ir lento
 MAX_RETRIES = 6
+FRESH_HOURS = 10             # un furni actualizado hace menos de esto se salta (hay dos corridas al día)
 TIME_BUDGET_MIN = 45         # al pasar este tiempo se guarda lo avanzado y se sigue en la próxima corrida
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
               "Chrome/140.0 Safari/537.36 Mercadillo/2.0")
@@ -248,19 +249,29 @@ def run(site: Path, full_scan: bool) -> int:
         scan = (all_keys[cursor:] + all_keys[:cursor])[:size]
         next_cursor = (cursor + size) % max(1, len(all_keys))
     today = datetime.now(TZ).date()
-    # los furnis ya actualizados hoy no se vuelven a pedir si corres el workflow otra vez el mismo día
-    # versiones anteriores no guardaban la fecha por furni: si el índice se guardó hoy, esos también cuentan
-    index_day = (datetime.fromisoformat(index["updated"]).astimezone(TZ).date().isoformat()
-                 if index.get("updated") else None)
-    fresh_today = {k for k, v in items.items() if v.get("u", index_day) == today.isoformat()}
-    priority = list(dict.fromkeys(list(targets) + list(launches) + [k for k in items if k not in fresh_today]))
+    # con dos corridas al día, un furni actualizado hace poco no se vuelve a pedir; los más viejos van primero
+    now = datetime.now(timezone.utc)
+    index_stamp = index.get("updated")
+
+    def updated_at(v: dict) -> datetime:
+        u = v.get("u") or index_stamp  # versiones anteriores no guardaban la hora por furni
+        if not u:
+            return datetime.min.replace(tzinfo=timezone.utc)
+        if len(u) == 10:  # solo fecha (versión anterior): cuenta como actualizado a media mañana de ese día
+            return datetime.fromisoformat(u).replace(hour=10, tzinfo=TZ).astimezone(timezone.utc)
+        return datetime.fromisoformat(u)
+
+    fresh_today = {k for k, v in items.items() if now - updated_at(v) < timedelta(hours=FRESH_HOURS)}
+    stale = sorted((k for k in items if k not in fresh_today),
+                   key=lambda k: (updated_at(items[k]), -(items[k].get("s") or 0)))
+    priority = list(dict.fromkeys(list(targets) + list(launches) + stale))
     seen = set(priority) | fresh_today
     scan_items = [(i, k) for i, k in enumerate(scan) if k not in seen]  # i = posición desde el cursor
     queue = priority + [k for _, k in scan_items]
     started = time.monotonic()
     last_note = started
     print(f"Consultando {len(queue):,} furnis ({len(priority):,} activos por actualizar, "
-          f"{len(fresh_today):,} ya actualizados hoy, {len(queue) - len(priority):,} nuevos del catálogo, "
+          f"{len(fresh_today):,} actualizados hace menos de {FRESH_HOURS} h, {len(queue) - len(priority):,} nuevos del catálogo, "
           f"{len(targets)} con aviso). Tiempo estimado: {math.ceil(len(queue) / BATCH_SIZE * (float(state.get('pause', PAUSE)) + 0.6) / 60)} min"
           f" (máximo {TIME_BUDGET_MIN} por corrida).")
 
@@ -339,7 +350,7 @@ def run(site: Path, full_scan: bool) -> int:
                      "a": to_int(stats.get("averagePrice")) or sm["avg"], "s": sm["sold"], "o": offers,
                      "sp": sm["spark"], "m": sm["fair"], "l": sm["low"], "h": sm["high"],
                      "dr": round(offers / per_day, 1) if offers is not None and per_day else None,
-                     "u": today.isoformat()}
+                     "u": datetime.now(timezone.utc).isoformat(timespec="seconds")}
             if key in launches:
                 entry["f"] = launches[key]
             items[key] = entry

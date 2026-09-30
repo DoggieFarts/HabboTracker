@@ -27,7 +27,7 @@ from pathlib import Path
 from recolector import KEEP_DAYS, file_name, load_json, request, save_json, to_int
 
 API = "https://habboapi.site/api/market/history"
-PAUSE = 2.2                 # 30 consultas por minuto como máximo, con margen
+MIN_INTERVAL = 2.1          # segundos entre el inicio de una consulta y la siguiente: menos de 30 por minuto
 HOTEL_CODES = {"habbo.es": "es", "habbo.com": "com", "habbo.com.br": "br", "habbo.de": "de", "habbo.fr": "fr",
                "habbo.it": "it", "habbo.nl": "nl", "habbo.fi": "fi", "habbo.com.tr": "tr"}
 TYPES = {"room": "roomItem", "wall": "wallItem"}
@@ -69,6 +69,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sitio", default="sitio")
     parser.add_argument("--minutos", type=float, default=20)
+    parser.add_argument("--avisar-fin", action="store_true", help="salir con código 3 si ya no quedan pendientes")
     args = parser.parse_args()
     site = Path(args.sitio)
 
@@ -87,14 +88,23 @@ def main() -> int:
     pending = sorted(((k, v) for k, v in index.get("items", {}).items() if k not in done and v.get("s")),
                      key=lambda kv: -kv[1]["s"])
     total_active = sum(1 for v in index.get("items", {}).values() if v.get("s"))
+    if not pending:
+        print(f"Historial largo completo: {len(done):,} furnis listos, no quedan pendientes.")
+        return 3 if args.avisar_fin else 0
     print(f"Historial largo: {len(done):,} furnis listos, {len(pending):,} pendientes. "
-          f"Esta corrida avanza hasta {args.minutos:g} min (unos {int(args.minutos * 60 / (PAUSE + 0.5)):,} furnis).")
+          f"Esta corrida avanza hasta {args.minutos:g} min (unos {int(args.minutos * 60 / (MIN_INTERVAL + 0.3)):,} furnis).")
 
     started, processed, days_added, errors = time.monotonic(), 0, 0, 0
+    last_start = 0.0
     for key, item in pending:
         if time.monotonic() - started > args.minutos * 60:
             break
         kind, cls = key.split(":", 1)
+        # el tiempo de respuesta cuenta dentro del intervalo: así se aprovecha el límite sin pasarlo
+        wait = last_start + MIN_INTERVAL - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        last_start = time.monotonic()
         try:
             data = fetch(cls, code)
             errors = 0
@@ -131,7 +141,6 @@ def main() -> int:
         if processed % 50 == 0:  # unos 2 minutos entre mensajes
             save_json(state_path, state)  # por si la corrida se corta, no se repite lo ya hecho
             print(f"  {processed:,} furnis, {days_added:,} días agregados ({(time.monotonic() - started) / 60:.0f} min)")
-        time.sleep(PAUSE)
 
     save_json(state_path, state)
     print(f"Listo: {processed:,} furnis con historial nuevo ({days_added:,} días agregados). "
