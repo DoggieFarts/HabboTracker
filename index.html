@@ -279,9 +279,9 @@
   const kindName = (t) => t === "wall" ? "pared" : "piso";
   const COIN = '<svg class="coin" viewBox="0 0 5 5" shape-rendering="crispEdges"><path fill="#8C5E06" d="M1 0h3v5H1zM0 1h5v3H0z"/><path fill="#D6961A" d="M1 1h3v3H1z"/><path fill="#F6D46B" d="M1 1h1v1H1z"/></svg>';
   const SORT_NOTES = {
-    deals: "Más baratos que su precio justo (la mediana de 30 días), entre los que se venden al menos una vez al día, se pueden revender en menos de un mes y dejan al menos 3 créditos de diferencia.",
+    deals: "Por debajo de su rango normal de precio, entre los que se venden al menos una vez al día y se pueden revender en menos de un mes.",
     volume: "Los que más se venden: son los más fáciles de revender.",
-    pricey: "Más caros que su precio justo, entre los que se venden seguido. Buen momento para vender si tienes uno.",
+    pricey: "Por encima de su rango normal, entre los que se venden seguido. Buen momento para vender si tienes uno.",
   };
 
   let index = null, all = [], catalog = null, sortMode = "deals", shown = PAGE, current = null, rangeDays = 30;
@@ -307,8 +307,9 @@
   function enrich(key, e) {
     const target = 0; // las alertas ahora son personales y viven en el bot de Telegram
     const fair = e.m || e.a || null;
+    const hasFair = !!e.m; // solo la mediana es confiable; el promedio de Habbo se distorsiona con un pico
     const delta = e.p && fair ? (e.p - fair) / fair : null;
-    return { key, name: e.n, cls: e.c, kind: e.t, price: e.p, avg: e.a, fair, low: e.l, high: e.h,
+    return { key, name: e.n, cls: e.c, kind: e.t, price: e.p, avg: e.a, fair, hasFair, low: e.l, high: e.h,
              sold: e.s || 0, perDay: (e.s || 0) / 30, offers: e.o,
              // furnis guardados por versiones anteriores no traen "dr": se calcula aquí con ofertas y ventas
              dr: e.dr ?? (e.o != null && e.s ? Math.round(e.o / (e.s / 30) * 10) / 10 : null), launched: e.f || null,
@@ -357,9 +358,12 @@
     if (q) rows = rows.filter((s) => norm(s.name).includes(q) || s.cls.toLowerCase().includes(q));
     const needVolume = !q;
     // en furnis de 2 o 3 créditos, un crédito de diferencia parece un -50%: se ignoran esas diferencias mínimas
-    const meaningful = (s) => s.fair >= 10 && Math.abs(s.price - s.fair) >= 3;
-    if (sortMode === "deals") rows = rows.filter((s) => s.delta != null && (!needVolume || (s.sold >= MIN_VOLUME && meaningful(s) && (s.dr == null || s.dr <= 30)))).sort((a, b) => a.delta - b.delta);
-    else if (sortMode === "pricey") rows = rows.filter((s) => s.delta != null && (!needVolume || (s.sold >= MIN_VOLUME && meaningful(s)))).sort((a, b) => b.delta - a.delta);
+    const meaningful = (s) => s.hasFair && s.fair >= 10 && Math.abs(s.price - s.fair) >= 3;
+    // una oportunidad tiene que estar por debajo de su rango normal, no solo un poco abajo del precio justo
+    const belowNormal = (s) => s.low ? s.price < s.low : s.delta <= -0.10;
+    const aboveNormal = (s) => s.high ? s.price > s.high : s.delta >= 0.10;
+    if (sortMode === "deals") rows = rows.filter((s) => s.delta != null && (!needVolume || (s.sold >= MIN_VOLUME && meaningful(s) && belowNormal(s) && (s.dr == null || s.dr <= 30)))).sort((a, b) => a.delta - b.delta);
+    else if (sortMode === "pricey") rows = rows.filter((s) => s.delta != null && (!needVolume || (s.sold >= MIN_VOLUME && meaningful(s) && aboveNormal(s)))).sort((a, b) => b.delta - a.delta);
     else rows = [...rows].sort((a, b) => b.sold - a.sold);
     $("sort-note").textContent = q ? `${fmt(rows.length)} con ventas recientes. Abajo aparecen también los que no se han vendido.` : SORT_NOTES[sortMode];
 
@@ -406,7 +410,9 @@
       `Está por debajo de su rango normal${range} y se venden unas ${fmt(Math.round(s.perDay))} al día.` + drNote];
     if (belowRange) return ["", "Barato, pero se mueve poco", `Está ${pct}% abajo de su precio justo, aunque solo se vendieron ${fmt(s.sold)} en 30 días.` + drNote];
     if (aboveRange) return ["bad", `${pct}% arriba de su precio justo`, `Está por encima de su rango normal${range}. No es buen momento para comprar; si tienes uno, puede ser buen momento para venderlo.`];
-    return ["", "En su rango normal", (range ? `Su rango normal va de ${fmt(s.low)} a ${fmt(s.high)} créditos. ` : "") + "Nada urgente." + drNote];
+    const side = d >= 0.05 ? ` Está ${pct}% arriba de su precio justo (${fmt(s.fair)}), pero sus precios varían mucho.`
+               : d <= -0.05 ? ` Está ${pct}% abajo de su precio justo (${fmt(s.fair)}), pero todavía dentro de lo normal.` : "";
+    return ["", "En su rango normal", (range ? `Su rango normal va de ${fmt(s.low)} a ${fmt(s.high)} créditos.` : "") + side + " Nada urgente." + drNote];
   }
 
   async function renderDetail(key) {
@@ -432,7 +438,7 @@
       if (!e.m || !e.l || !e.h) {
         const st = statsFromDays(current.days);
         if (st.fair) {
-          Object.assign(current, { fair: st.fair, low: st.low, high: st.high,
+          Object.assign(current, { fair: st.fair, low: st.low, high: st.high, hasFair: true,
                                    delta: current.price ? (current.price - st.fair) / st.fair : null });
           paintSummary(current);
         }
@@ -657,7 +663,7 @@
       const net = s.price && s.fair ? Math.round(s.fair * (1 - fee / 100) - s.price) : 0;
       return { ...s, net, roi: s.price ? net / s.price : 0 };
     }).filter((s) => !(s.launched && daysAgo(s.launched) < 14)) // recién lanzados: su precio todavía se está acomodando
-      .filter((s) => s.price && s.price <= budget && s.perDay >= 1 && s.dr != null && s.dr <= budgetDays && s.net >= 2 && s.roi >= 0.03)
+      .filter((s) => s.hasFair && s.price && s.price <= budget && s.perDay >= 1 && s.dr != null && s.dr <= budgetDays && s.net >= 2 && s.roi >= 0.03)
       .sort((a, b) => b.roi - a.roi || b.perDay - a.perDay);
     const picks = []; let left = budget;
     for (const c of cands) {

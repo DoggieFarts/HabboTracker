@@ -251,10 +251,9 @@ def run(site: Path, full_scan: bool) -> int:
     today = datetime.now(TZ).date()
     # con dos corridas al día, un furni actualizado hace poco no se vuelve a pedir; los más viejos van primero
     now = datetime.now(timezone.utc)
-    index_stamp = index.get("updated")
-
     def updated_at(v: dict) -> datetime:
-        u = v.get("u") or index_stamp  # versiones anteriores no guardaban la hora por furni
+        # un furni sin hora de actualización viene de una versión anterior: se trata como el más atrasado
+        u = v.get("u")
         if not u:
             return datetime.min.replace(tzinfo=timezone.utc)
         if len(u) == 10:  # solo fecha (versión anterior): cuenta como actualizado a media mañana de ese día
