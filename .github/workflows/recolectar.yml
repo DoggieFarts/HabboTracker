@@ -30,18 +30,22 @@ jobs:
           python-version: "3.12"
 
       - name: Traer los datos guardados
+        timeout-minutes: 3
+        env:
+          GIT_TERMINAL_PROMPT: "0"
         run: |
-          if git ls-remote --exit-code --heads origin datos > /dev/null; then
-            git clone --quiet --depth 1 --branch datos "https://github.com/${GITHUB_REPOSITORY}.git" sitio
-            rm -rf sitio/.git
+          mkdir -p sitio
+          if timeout 60 git fetch --quiet --depth 1 origin datos 2>/dev/null; then
+            git archive FETCH_HEAD | tar -x -C sitio
+            echo "Datos anteriores recuperados."
           else
-            mkdir sitio
+            echo "Primera corrida: todavía no hay datos guardados."
           fi
 
       - name: Consultar el Mercadillo
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python recolector.py --sitio sitio ${{ inputs.completo && '--completo' || '' }}
+        run: python -u recolector.py --sitio sitio ${{ inputs.completo && '--completo' || '' }}
 
       - name: Publicar la página
         env:
