@@ -339,7 +339,7 @@
     return { key, name: e.n, cls: e.c, kind: e.t, price: e.p, avg: e.a, fair, hasFair, low: e.l, high: e.h,
              sold: e.s || 0, perDay: (e.s || 0) / 30, offers: e.o,
              // furnis guardados por versiones anteriores no traen "dr": se calcula aquí con ofertas y ventas
-             dr: e.dr ?? (e.o != null && e.s ? Math.round(e.o / (e.s / 30) * 10) / 10 : null), launched: e.f || null,
+             dr: e.o ? (e.dr ?? (e.s ? Math.round(e.o / (e.s / 30) * 10) / 10 : null)) : null, launched: e.f || null,
              spark: e.sp || [], target, delta, hit: !!(target && e.p && e.p <= target) };
   }
   function deltaText(d) {
@@ -428,7 +428,10 @@
     const drNote = s.dr == null ? "" : slow
       ? ` Ojo: hay muchas ofertas abiertas para lo que se vende, podrías tardar unos ${fmt(Math.round(s.dr))} días en revenderlo.`
       : ` Con ${fmt(s.offers)} ofertas abiertas, revenderlo tomaría unos ${fmt(Math.max(1, Math.round(s.dr)))} días.`;
-    if (!s.price) return ["", "Nadie lo está vendiendo ahora", s.fair ? `Su precio justo es de ${fmt(s.fair)} créditos.` : "Todavía no hay ventas suficientes para calcular su precio justo."];
+    if (!s.price) return ["", "Nadie lo está vendiendo en este momento",
+      (s.fair ? `Su precio justo es de ${fmt(s.fair)} créditos. ` : "") +
+      (s.sold ? `Se venden unas ${s.perDay >= 1 ? fmt(Math.round(s.perDay)) + " al día" : fmt(s.sold) + " al mes"}, así que las ofertas suelen durar poco: si alguien publica uno cerca de su precio justo, conviene revisarlo rápido.`
+              : "Todavía no hay ventas suficientes para calcular su precio justo.")];
     if (s.hit) return ["good", "Llegó a tu precio", `La oferta más baja es de ${fmt(s.price)} créditos y tu aviso está en ${fmt(s.target)}. Revisa el Mercadillo antes de que alguien más la tome.`];
     if (d == null) return ["", "Todavía sin precio justo", "Hace falta más historial de ventas para compararlo."];
     const belowRange = s.low ? s.price < s.low : d <= -0.10, aboveRange = s.high ? s.price > s.high : d >= 0.10;
@@ -494,8 +497,8 @@
 
   function paintSummary(s) {
     $("s-low").textContent = fmt(s.price);
-    $("s-low").nextElementSibling.textContent = s.liveAt
-      ? `Oferta más baja, en vivo hace ${agoShort(Date.now() / 1000 - s.liveAt)}` : "Oferta más baja ahora";
+    const when = s.liveAt ? `, en vivo hace ${agoShort(Date.now() / 1000 - s.liveAt)}` : "";
+    $("s-low").nextElementSibling.textContent = s.price ? `Oferta más baja${when || " ahora"}` : `Sin ofertas publicadas${when}`;
     $("s-fair").textContent = fmt(s.fair);
     $("s-day").textContent = s.perDay >= 1 ? fmt(Math.round(s.perDay)) : s.sold ? (s.perDay).toFixed(1) : "0";
     $("s-dr").textContent = s.dr == null ? "–" : s.dr < 1 ? "<1" : fmt(Math.round(s.dr));
@@ -620,7 +623,7 @@
                           : fmtDay(p.day, true) + (withYear ? ` ${p.day.getFullYear()}` : "");
       tip.innerHTML = `<div class="d">${when}</div><div>Promedio <b>${p.avg ? fmt(p.avg) : "sin ventas"}</b></div>` +
         (p.low ? `<div>Oferta más baja <b>${fmt(p.low)}</b></div>` : "") +
-        `<div>Vendidos${weekly ? " en la semana" : ""} <b>${fmt(p.sold)}</b></div><div>Ofertas abiertas <b>${fmt(p.offers)}</b></div>`;
+        `<div>Vendidos${weekly ? " en la semana" : ""} <b>${fmt(p.sold)}</b></div><div>${weekly ? "Ofertas al cierre de la semana" : "Ofertas abiertas ese día"} <b>${fmt(p.offers)}</b></div>`;
       tip.hidden = false;
       const px = cx * (r.width / W), tw = tip.offsetWidth;
       tip.style.left = (px + 14 + tw < r.width ? px + 14 : Math.max(0, px - 14 - tw)) + "px";
@@ -910,7 +913,7 @@
     s.price = p || null;
     if (o != null) s.offers = o;
     s.delta = s.price && s.fair ? (s.price - s.fair) / s.fair : null;
-    if (o != null && s.sold) s.dr = Math.round(o / (s.sold / 30) * 10) / 10;
+    if (o != null) s.dr = o > 0 && s.sold ? Math.round(o / (s.sold / 30) * 10) / 10 : null; // sin ofertas no hay con qué calcularlo
     s.liveAt = live.t - age;
     return true;
   }
