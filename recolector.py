@@ -49,6 +49,7 @@ PAUSE = 1.0                  # segundos entre peticiones, para no saturar la API
 SCAN_DAYS = 7                # el catálogo completo se revisa en esta cantidad de días
 CATALOG_MAX_AGE_DAYS = 7
 KEEP_DAYS = 365              # historial que se conserva por furni
+TIME_BUDGET_MIN = 45         # al pasar este tiempo se guarda lo avanzado y se sigue en la próxima corrida
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
               "Chrome/140.0 Safari/537.36 Mercadillo/2.0")
 
@@ -196,15 +197,20 @@ def run(site: Path, full_scan: bool) -> int:
     # qué consultar hoy: avisos + furnis activos + una rebanada del catálogo
     all_keys = [f"{k}:{c}" for _, c, k in catalog]
     cursor = int(state.get("cursor", 0))
-    if full_scan or not items:
-        scan = all_keys
+    full_mode = bool(full_scan or not items or state.get("partial"))
+    if full_mode:
+        cursor = cursor if state.get("partial") else 0  # si la anterior quedó a medias, sigue donde iba
+        scan = all_keys[cursor:] + all_keys[:cursor]
         next_cursor = 0
     else:
         size = math.ceil(len(all_keys) / SCAN_DAYS) if all_keys else 0
         cursor = cursor % max(1, len(all_keys))
         scan = (all_keys[cursor:] + all_keys[:cursor])[:size]
         next_cursor = (cursor + size) % max(1, len(all_keys))
-    queue = list(dict.fromkeys(list(targets) + list(items) + scan))
+    priority = list(dict.fromkeys(list(targets) + list(items)))
+    seen = set(priority)
+    queue = priority + [k for k in scan if k not in seen]
+    started = time.monotonic()
     print(f"Consultando {len(queue):,} furnis ({len(items):,} activos, {len(scan):,} del catálogo, "
           f"{len(targets)} con aviso). Tiempo estimado: {math.ceil(len(queue) / BATCH_SIZE * (PAUSE + 0.6) / 60)} min.")
 
@@ -212,6 +218,10 @@ def run(site: Path, full_scan: bool) -> int:
     today = datetime.now(TZ).date()
     done, found_total, stopped = 0, 0, False
     for start in range(0, len(queue), BATCH_SIZE):
+        if time.monotonic() - started > TIME_BUDGET_MIN * 60:
+            print(f"Se alcanzó el límite de {TIME_BUDGET_MIN:g} min; se guarda lo avanzado y la próxima corrida sigue.")
+            stopped = True
+            break
         chunk = queue[start:start + BATCH_SIZE]
         payload = {"roomItems": [{"item": k[5:]} for k in chunk if k.startswith("room:")],
                    "wallItems": [{"item": k[5:]} for k in chunk if k.startswith("wall:")]}
@@ -263,8 +273,9 @@ def run(site: Path, full_scan: bool) -> int:
         done += len(chunk)
         if start + BATCH_SIZE < len(queue):
             time.sleep(PAUSE)
-        if done % 2000 < BATCH_SIZE:
-            print(f"  {done:,} de {len(queue):,}")
+        if done // 1000 > (done - len(chunk)) // 1000:
+            mins = (time.monotonic() - started) / 60
+            print(f"  {done:,} de {len(queue):,}  ({mins:.0f} min, {found_total:,} con ventas)")
 
     for key in targets:  # que los avisos sin datos aún aparezcan en la página
         items.setdefault(key, {"n": names.get(key, key.split(":", 1)[1]), "c": key.split(":", 1)[1],
@@ -275,7 +286,14 @@ def run(site: Path, full_scan: bool) -> int:
         "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "targets": targets, "catalog_size": len(catalog), "items": items,
     })
-    state.update({"hotel": hotel, "cursor": cursor if stopped else next_cursor,
+    scanned = max(0, done - len(priority))
+    if stopped and all_keys:
+        resume = (cursor + scanned) % len(all_keys)
+    else:
+        resume = next_cursor
+    swept = (int(state.get("swept", 0)) if state.get("partial") else 0) + scanned
+    partial = bool(stopped and full_mode and swept < len(all_keys))
+    state.update({"hotel": hotel, "cursor": resume, "partial": partial, "swept": swept if partial else 0,
                   "last_run": datetime.now(timezone.utc).isoformat(timespec="seconds")})
     save_json(site / "estado.json", state)
     print(f"Listo: {done:,} consultados, {found_total:,} con datos, {len(items):,} furnis en la página.")
