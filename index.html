@@ -389,11 +389,12 @@
     if (s.hit) return ["good", "Llegó a tu precio", `La oferta más baja es de ${fmt(s.price)} créditos y tu aviso está en ${fmt(s.target)}. Revisa el Mercadillo antes de que alguien más la tome.`];
     if (d == null) return ["", "Todavía sin precio justo", "Hace falta más historial de ventas para compararlo."];
     const belowRange = s.low ? s.price < s.low : d <= -0.10, aboveRange = s.high ? s.price > s.high : d >= 0.10;
+    const range = s.low && s.high ? ` (${fmt(s.low)} a ${fmt(s.high)})` : "";
     if (belowRange && s.perDay >= 1) return [slow ? "" : "good", `${pct}% abajo de su precio justo`,
-      `Está por debajo de su rango normal (${fmt(s.low)} a ${fmt(s.high)}) y se venden unas ${fmt(Math.round(s.perDay))} al día.` + drNote];
+      `Está por debajo de su rango normal${range} y se venden unas ${fmt(Math.round(s.perDay))} al día.` + drNote];
     if (belowRange) return ["", "Barato, pero se mueve poco", `Está ${pct}% abajo de su precio justo, aunque solo se vendieron ${fmt(s.sold)} en 30 días.` + drNote];
-    if (aboveRange) return ["bad", `${pct}% arriba de su precio justo`, `Está por encima de su rango normal (${fmt(s.low)} a ${fmt(s.high)}). No es buen momento para comprar; si tienes uno, puede ser buen momento para venderlo.`];
-    return ["", "En su rango normal", `Su rango normal va de ${fmt(s.low)} a ${fmt(s.high)} créditos. Nada urgente.` + drNote];
+    if (aboveRange) return ["bad", `${pct}% arriba de su precio justo`, `Está por encima de su rango normal${range}. No es buen momento para comprar; si tienes uno, puede ser buen momento para venderlo.`];
+    return ["", "En su rango normal", (range ? `Su rango normal va de ${fmt(s.low)} a ${fmt(s.high)} créditos. ` : "") + "Nada urgente." + drNote];
   }
 
   async function renderDetail(key) {
@@ -405,6 +406,49 @@
     const img = $("d-img"); img.style.visibility = "visible"; img.onerror = () => { img.style.visibility = "hidden"; }; img.src = IMG(s.cls);
     $("d-meta").textContent = `${s.cls} en ${index.hotel}, furni de ${kindName(s.kind)}` +
       (s.launched ? `, salió hace ${fmt(daysAgo(s.launched))} días` : "");
+    paintSummary(s);
+    $("aviso-price").value = s.target || "";
+    $("aviso-text").textContent = s.target
+      ? `Tienes un aviso en ${fmt(s.target)} créditos. Para cambiarlo, copia la línea nueva y reemplaza la anterior en avisos.json.`
+      : "Pon el precio al que te gustaría comprarlo. Copia la línea y pégala en la lista de avisos.";
+    $("chart").innerHTML = `<div class="empty">Cargando historial…</div>`;
+    window.scrollTo(0, 0);
+    try {
+      const r = await fetch(`h/${s.kind}/${encodeURIComponent(fileName(s.cls))}.json?v=${encodeURIComponent(index.updated || "")}`);
+      const hist = r.ok ? await r.json() : { d: {} };
+      if (!(current && current.key === key)) return;
+      current.days = hist.d || {};
+      // datos guardados por versiones anteriores: el precio justo y el rango se calculan aquí con el historial
+      if (!e.m || !e.l || !e.h) {
+        const st = statsFromDays(current.days);
+        if (st.fair) {
+          Object.assign(current, { fair: st.fair, low: st.low, high: st.high,
+                                   delta: current.price ? (current.price - st.fair) / st.fair : null });
+          paintSummary(current);
+        }
+      }
+      drawChart();
+    } catch { $("chart").innerHTML = `<div class="empty">No se pudo cargar el historial.</div>`; }
+  }
+
+  function weightedPct(pairs, q) {
+    const sorted = pairs.filter(([p, w]) => p && w).sort((a, b) => a[0] - b[0]);
+    const total = sorted.reduce((a, [, w]) => a + w, 0);
+    if (!total) return null;
+    let acc = 0;
+    for (const [p, w] of sorted) { acc += w; if (acc >= q * total) return p; }
+    return sorted[sorted.length - 1][0];
+  }
+  function statsFromDays(days) {
+    const withAvg = Object.keys(days).filter((d) => days[d][0]).sort();
+    if (!withAvg.length) return {};
+    const last = parseDay(withAvg[withAvg.length - 1]);
+    const since = dayKey(new Date(last.getFullYear(), last.getMonth(), last.getDate() - 29));
+    const pairs = withAvg.filter((d) => d >= since).map((d) => [days[d][0], days[d][1] || 0]);
+    return { fair: weightedPct(pairs, 0.5), low: weightedPct(pairs, 0.25), high: weightedPct(pairs, 0.75) };
+  }
+
+  function paintSummary(s) {
     $("s-low").textContent = fmt(s.price);
     $("s-fair").textContent = fmt(s.fair);
     $("s-day").textContent = s.perDay >= 1 ? fmt(Math.round(s.perDay)) : s.sold ? (s.perDay).toFixed(1) : "0";
@@ -415,19 +459,10 @@
     const fee = Number(index.fee_pct ?? 1);
     if (s.price && s.fair) {
       const net = Math.round(s.fair * (1 - fee / 100) - s.price);
-      $("margin").innerHTML = `Si compras a ${fmt(s.price)} y revendes a su precio justo (${fmt(s.fair)}), te quedan <b class="${net >= 0 ? "pos" : "neg"}">${net >= 0 ? "+" : "−"}${fmt(Math.abs(net))}</b> créditos netos con ${fee}% de comisión.`;
+      $("margin").innerHTML = net > 0
+        ? `Si compras a ${fmt(s.price)} y revendes a su precio justo (${fmt(s.fair)}), te quedan <b class="pos">+${fmt(net)}</b> créditos netos con ${fee}% de comisión.`
+        : `Comprar a ${fmt(s.price)} y revender a su precio justo (${fmt(s.fair)}) <b class="neg">no deja ganancia</b> después de ${fee}% de comisión.`;
     } else $("margin").textContent = "El margen aparece cuando hay una oferta abierta y un precio justo.";
-    $("aviso-price").value = s.target || "";
-    $("aviso-text").textContent = s.target
-      ? `Tienes un aviso en ${fmt(s.target)} créditos. Para cambiarlo, copia la línea nueva y reemplaza la anterior en avisos.json.`
-      : "Pon el precio al que te gustaría comprarlo. Copia la línea y pégala en la lista de avisos.";
-    $("chart").innerHTML = `<div class="empty">Cargando historial…</div>`;
-    window.scrollTo(0, 0);
-    try {
-      const r = await fetch(`h/${s.kind}/${encodeURIComponent(fileName(s.cls))}.json?v=${encodeURIComponent(index.updated || "")}`);
-      const hist = r.ok ? await r.json() : { d: {} };
-      if (current && current.key === key) { current.days = hist.d || {}; drawChart(); }
-    } catch { $("chart").innerHTML = `<div class="empty">No se pudo cargar el historial.</div>`; }
   }
 
   function niceStep(raw) {
@@ -449,6 +484,23 @@
       const v = s.days[dayKey(dt)] || [];
       pts.push({ day: new Date(dt), avg: v[0] || null, sold: v[1] || 0, offers: v[2] ?? null, low: v[3] || null });
     }
+    // con más de 4 meses se agrupa por semana, si no la gráfica queda ilegible
+    let weekly = false;
+    if (pts.length > 120) {
+      weekly = true;
+      const agg = [];
+      for (let i = 0; i < pts.length; i += 7) {
+        const wk = pts.slice(i, i + 7), withAvg = wk.filter((p) => p.avg);
+        const weight = withAvg.reduce((a, p) => a + (p.sold || 1), 0);
+        const lows = wk.map((p) => p.low).filter(Boolean);
+        agg.push({ day: wk[0].day, avg: withAvg.length ? Math.round(withAvg.reduce((a, p) => a + p.avg * (p.sold || 1), 0) / weight) : null,
+                   sold: wk.reduce((a, p) => a + p.sold, 0), low: lows.length ? Math.min(...lows) : null,
+                   offers: [...wk].reverse().find((p) => p.offers != null)?.offers ?? null });
+      }
+      pts.length = 0; pts.push(...agg);
+    }
+    const withYear = (lastDay - start) / 86400000 > 300 || start.getFullYear() !== lastDay.getFullYear();
+    const axisLabel = (d) => withYear ? `${MONTHS[d.getMonth()]} ${d.getFullYear()}` : fmtDay(d);
     const values = pts.flatMap((p) => [p.avg, p.low]).filter(Boolean);
     if (s.target) values.push(s.target);
     if (!values.length) { host.innerHTML = `<div class="empty">No hay ventas en este periodo.</div>`; return; }
@@ -468,11 +520,16 @@
       svg += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#D2DBE3"/>`;
       svg += `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#5B6B7A">${fmt(Math.round(v))}</text>`;
     }
-    const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(plotW / 64))));
+    const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(plotW / (withYear ? 76 : 64)))));
     for (let i = 0; i < n; i += every)
-      svg += `<text x="${L + w * i + w / 2}" y="${H - 6}" text-anchor="middle" font-size="11" fill="#5B6B7A">${fmtDay(pts[i].day)}</text>`;
+      svg += `<text x="${L + w * i + w / 2}" y="${H - 6}" text-anchor="middle" font-size="11" fill="#5B6B7A">${axisLabel(pts[i].day)}</text>`;
     if (s.low && s.high) {
-      svg += `<rect x="${L}" y="${y(s.high)}" width="${plotW}" height="${Math.max(1, y(s.low) - y(s.high))}" fill="#E3EEF5" opacity=".75"/>`;
+      // el rango normal sale de los últimos 30 días, así que solo se sombrea ese tramo
+      const bandFrom = new Date(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate() - 29);
+      let bi = pts.findIndex((p, i) => (pts[i + 1] ? pts[i + 1].day : new Date(8.64e15)) > bandFrom);
+      if (bi < 0) bi = 0;
+      const bx = L + w * bi;
+      svg += `<rect x="${bx}" y="${y(s.high)}" width="${L + plotW - bx}" height="${Math.max(1, y(s.low) - y(s.high))}" fill="#E3EEF5" opacity=".75"/>`;
     }
     const maxSold = Math.max(1, ...pts.map((p) => p.sold)), bw = Math.max(1, w * 0.62);
     pts.forEach((p, i) => {
@@ -513,9 +570,11 @@
       if (p.avg) { dot.setAttribute("x", cx - 5); dot.setAttribute("y", y(p.avg) - 5); dot.setAttribute("visibility", "visible"); }
       else dot.setAttribute("visibility", "hidden");
       host.querySelectorAll(".bar").forEach((b) => b.setAttribute("fill", +b.dataset.i === i ? "#236A93" : "#C8D3DD"));
-      tip.innerHTML = `<div class="d">${fmtDay(p.day, true)}</div><div>Promedio <b>${p.avg ? fmt(p.avg) : "sin ventas"}</b></div>` +
+      const when = weekly ? `Semana del ${fmtDay(p.day)} ${p.day.getFullYear()}`
+                          : fmtDay(p.day, true) + (withYear ? ` ${p.day.getFullYear()}` : "");
+      tip.innerHTML = `<div class="d">${when}</div><div>Promedio <b>${p.avg ? fmt(p.avg) : "sin ventas"}</b></div>` +
         (p.low ? `<div>Oferta más baja <b>${fmt(p.low)}</b></div>` : "") +
-        `<div>Vendidos <b>${fmt(p.sold)}</b></div><div>Ofertas abiertas <b>${fmt(p.offers)}</b></div>`;
+        `<div>Vendidos${weekly ? " en la semana" : ""} <b>${fmt(p.sold)}</b></div><div>Ofertas abiertas <b>${fmt(p.offers)}</b></div>`;
       tip.hidden = false;
       const px = cx * (r.width / W), tw = tip.offsetWidth;
       tip.style.left = (px + 14 + tw < r.width ? px + 14 : Math.max(0, px - 14 - tw)) + "px";
