@@ -229,6 +229,7 @@ def run(site: Path, full_scan: bool) -> int:
     scan_items = [(i, k) for i, k in enumerate(scan) if k not in seen]  # i = posición desde el cursor
     queue = priority + [k for _, k in scan_items]
     started = time.monotonic()
+    last_note = started
     print(f"Consultando {len(queue):,} furnis ({len(priority):,} activos por actualizar, "
           f"{len(fresh_today):,} ya actualizados hoy, {len(queue) - len(priority):,} nuevos del catálogo, "
           f"{len(targets)} con aviso). Tiempo estimado: {math.ceil(len(queue) / BATCH_SIZE * (float(state.get('pause', PAUSE)) + 0.6) / 60)} min"
@@ -242,7 +243,12 @@ def run(site: Path, full_scan: bool) -> int:
             print(f"Se alcanzó el límite de {TIME_BUDGET_MIN:g} min; se guarda lo avanzado y la próxima corrida sigue.")
             stopped = True
             break
+        if time.monotonic() - last_note > 120:  # señal de vida cada 2 minutos
+            last_note = time.monotonic()
+            print(f"  sigo trabajando: {done:,} de {len(queue):,} ({(last_note - started) / 60:.0f} min, "
+                  f"pausa {pause:.1f} s)")
         chunk = queue[start:start + BATCH_SIZE]
+        t0 = time.monotonic()
         payload = {"roomItems": [{"item": k[5:]} for k in chunk if k.startswith("room:")],
                    "wallItems": [{"item": k[5:]} for k in chunk if k.startswith("wall:")]}
         result = None
@@ -267,7 +273,10 @@ def run(site: Path, full_scan: bool) -> int:
                 print(f"Error {e.code} de {hotel}; se guarda lo avanzado y la próxima corrida sigue.")
             except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
                 if attempt < MAX_RETRIES - 1:
-                    time.sleep(15 * (attempt + 1))
+                    wait = 15 * (attempt + 1)
+                    print(f"{hotel} no respondió a tiempo ({type(e).__name__}); reintento {attempt + 1} "
+                          f"en {wait} s.")
+                    time.sleep(wait)
                     continue
                 print(f"Fallo de conexión ({e}); se guarda lo avanzado y la próxima corrida sigue.")
             break
@@ -275,6 +284,9 @@ def run(site: Path, full_scan: bool) -> int:
             stopped = True
             break
 
+        took = time.monotonic() - t0
+        if took > 20:
+            print(f"  {hotel} tardó {took:.0f} s en responder una consulta.")
         found = {f"room:{d.get('item')}": d for d in result.get("roomItemData") or []}
         found.update({f"wall:{d.get('item')}": d for d in result.get("wallItemData") or []})
         for key in chunk:
