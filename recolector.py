@@ -53,7 +53,7 @@ KEEP_DAYS = 730              # historial que se conserva por furni (2 años, lo 
 MAX_PAUSE = 12.0             # pausa máxima entre consultas cuando Habbo pide ir lento
 MAX_RETRIES = 6
 FRESH_HOURS = 10             # un furni actualizado hace menos de esto se salta (hay dos corridas al día)
-TIME_BUDGET_MIN = 45         # al pasar este tiempo se guarda lo avanzado y se sigue en la próxima corrida
+TIME_BUDGET_MIN = 75         # tope de seguridad: al pasarlo se guarda lo avanzado y la próxima corrida sigue
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
               "Chrome/140.0 Safari/537.36 Mercadillo/2.0")
 
@@ -198,9 +198,18 @@ def summarize(days: dict[str, list]) -> dict:
     sold = sum(v[1] or 0 for v in recent)
     spark = [v[0] for v in recent if v[0]]
     pairs = [(v[0], v[1]) for v in recent]
+    fair, low, high = (weighted_percentile(pairs, q) for q in (0.5, 0.25, 0.75))
+    plain, latest = sorted(spark), sorted(spark[-10:])
+    pick = lambda arr: (arr[len(arr) // 2], arr[len(arr) // 4], arr[(3 * len(arr)) // 4])  # noqa: E731
+    if fair and len(latest) >= 5 and (fair > latest[len(latest) // 2] * 2 or fair < latest[len(latest) // 2] / 2):
+        # el precio cambió de nivel hace poco (por ejemplo, se desplomó al volver al catálogo):
+        # el precio justo y su rango siguen a la última semana y media en lugar de a todo el mes
+        fair, low, high = pick(latest)
+    elif fair and len(plain) >= 5 and (fair > plain[len(plain) // 2] * 3 or fair < plain[len(plain) // 2] / 3):
+        # un solo día con muchas ventas a un precio raro dominaba el cálculo: se usan los días sin pesar
+        fair, low, high = pick(plain)
     return {"sold": sold, "spark": spark, "avg": round(sum(spark) / len(spark)) if spark else None,
-            "fair": weighted_percentile(pairs, 0.5), "low": weighted_percentile(pairs, 0.25),
-            "high": weighted_percentile(pairs, 0.75)}
+            "fair": fair, "low": low, "high": high}
 
 
 # ---------------------------------------------------------------------------
@@ -348,7 +357,7 @@ def run(site: Path, full_scan: bool) -> int:
             entry = {"n": names.get(key, cls), "c": cls, "t": kind, "p": current,
                      "a": to_int(stats.get("averagePrice")) or sm["avg"], "s": sm["sold"], "o": offers,
                      "sp": sm["spark"], "m": sm["fair"], "l": sm["low"], "h": sm["high"],
-                     "dr": round(offers / per_day, 1) if offers is not None and per_day else None,
+                     "dr": round(offers / per_day, 1) if offers and per_day else None,  # sin ofertas no hay dato
                      "u": datetime.now(timezone.utc).isoformat(timespec="seconds")}
             if key in launches:
                 entry["f"] = launches[key]
