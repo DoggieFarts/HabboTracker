@@ -148,6 +148,10 @@
   .radar-sum { padding: 14px 16px; } .radar-sum p { margin: 6px 0 0; color: var(--slate); font-size: 14px; }
   .radar-sum h4 { margin: 0; font-size: 16px; }
   .radar-box ul { margin: 6px 0 0; padding-left: 18px; } .radar-box li { margin: 2px 0; }
+  .checks { list-style: none; margin: 10px 0 0; padding: 0; font-size: 14px; }
+  .checks li { display: flex; gap: 8px; padding: 4px 0; } .checks li span { font-weight: 700; width: 14px; flex: none; }
+  .checks li.ok span { color: var(--good); } .checks li.no span { color: var(--bad); }
+  .checks em { color: var(--slate); font-style: normal; }
   .tabs button[aria-selected="true"] { background: var(--pool-soft); color: var(--pool); }
   .row { grid-template-columns: 38px 1fr auto; }
   .row.with-spark { grid-template-columns: 38px 1fr 64px auto; }
@@ -333,10 +337,18 @@
 
   function enrich(key, e) {
     const target = 0; // las alertas ahora son personales y viven en el bot de Telegram
-    const fair = e.m || e.a || null;
-    const hasFair = !!e.m; // solo la mediana es confiable; el promedio de Habbo se distorsiona con un pico
+    // si el precio justo guardado no cuadra con lo que se vendió en el último mes (más del triple o menos
+    // de un tercio de la mediana diaria), se toma como dato equivocado y se usa la mediana de esas ventas
+    const sp = (e.sp || []).filter(Boolean).slice().sort((x, y) => x - y);
+    const spMed = sp.length >= 5 ? sp[Math.floor(sp.length / 2)] : null;
+    const last10 = (e.sp || []).filter(Boolean).slice(-10).sort((x, y) => x - y);
+    const lastMed = last10.length >= 5 ? last10[Math.floor(last10.length / 2)] : null;
+    const suspicious = !!(e.m && ((spMed && (e.m > spMed * 3 || e.m < spMed / 3)) ||
+                                  (lastMed && (e.m > lastMed * 2 || e.m < lastMed / 2))));
+    const fair = suspicious ? (lastMed || spMed) : (e.m || e.a || null);
+    const hasFair = !!e.m && !suspicious; // solo la mediana revisada es confiable para recomendar
     const delta = e.p && fair ? (e.p - fair) / fair : null;
-    return { key, name: e.n, cls: e.c, kind: e.t, price: e.p, avg: e.a, fair, hasFair, low: e.l, high: e.h,
+    return { key, name: e.n, cls: e.c, kind: e.t, price: e.p, avg: e.a, fair, hasFair, low: suspicious ? null : e.l, high: suspicious ? null : e.h,
              sold: e.s || 0, perDay: (e.s || 0) / 30, offers: e.o,
              // furnis guardados por versiones anteriores no traen "dr": se calcula aquí con ofertas y ventas
              dr: e.o ? (e.dr ?? (e.s ? Math.round(e.o / (e.s / 30) * 10) / 10 : null)) : null, launched: e.f || null,
@@ -466,8 +478,9 @@
       if (!(current && current.key === key)) return;
       current.days = hist.d || {};
       // datos guardados por versiones anteriores: el precio justo y el rango se calculan aquí con el historial
-      if (!e.m || !e.l || !e.h) {
-        const st = statsFromDays(current.days);
+      const st = statsFromDays(current.days);
+      const off = st.fair && current.fair && (current.fair > st.fair * 2 || current.fair < st.fair / 2);
+      if (!e.m || !e.l || !e.h || off) {
         if (st.fair) {
           Object.assign(current, { fair: st.fair, low: st.low, high: st.high, hasFair: true,
                                    delta: current.price ? (current.price - st.fair) / st.fair : null });
@@ -492,7 +505,16 @@
     const last = parseDay(withAvg[withAvg.length - 1]);
     const since = dayKey(new Date(last.getFullYear(), last.getMonth(), last.getDate() - 29));
     const pairs = withAvg.filter((d) => d >= since).map((d) => [days[d][0], days[d][1] || 0]);
-    return { fair: weightedPct(pairs, 0.5), low: weightedPct(pairs, 0.25), high: weightedPct(pairs, 0.75) };
+    let out = { fair: weightedPct(pairs, 0.5), low: weightedPct(pairs, 0.25), high: weightedPct(pairs, 0.75) };
+    // mismas protecciones que el recolector: si el precio cambió de nivel hace poco, se sigue a los
+    // últimos días; si un solo día raro dominaba el cálculo, se usan los días sin pesar por ventas
+    const plain = pairs.map(([p]) => p).sort((x, y) => x - y);
+    const latest = pairs.slice(-10).map(([p]) => p).sort((x, y) => x - y);
+    const pick = (arr) => ({ fair: arr[Math.floor(arr.length / 2)], low: arr[Math.floor(arr.length / 4)], high: arr[Math.floor(arr.length * 3 / 4)] });
+    const mid = (arr) => arr[Math.floor(arr.length / 2)];
+    if (out.fair && latest.length >= 5 && (out.fair > mid(latest) * 2 || out.fair < mid(latest) / 2)) out = pick(latest);
+    else if (out.fair && plain.length >= 5 && (out.fair > mid(plain) * 3 || out.fair < mid(plain) / 3)) out = pick(plain);
+    return out;
   }
 
   function paintSummary(s) {
@@ -757,8 +779,16 @@
         <div><b>${pct1(p.market_ret)}</b><span>Mercado en general</span></div>
         <div><b>${Math.round(p.beat_share * 100)}%</b><span>Semanas que le ganó</span></div></div>`;
     if (!p.enabled) {
+      const excess = p.picks_ret - p.market_ret;
+      const checks = [
+        [excess > 0.01, `Diferencia típica contra el mercado: ${pct1(excess)}`, "más de +1%"],
+        [p.beat_share >= 0.6, `Semanas que le ganó: ${Math.round(p.beat_share * 100)}%`, "al menos 60%"],
+        [p.hit_rate > 0.5, `Compras que terminaron con ganancia: ${Math.round(p.hit_rate * 100)}%`, "más de 50%"],
+        [(p.t_stat || 0) >= 2, `Confianza de que no es suerte: ${(p.t_stat || 0).toFixed(1)}`, "al menos 2.0"],
+      ];
       box.innerHTML = `<div class="panel radar-sum"><h4>Por ahora no hay recomendaciones</h4>
-        <p>Probamos las señales con ${p.test_weeks} semanas de historial (${period}), sin mirar el futuro. Todavía no le ganan al mercado con suficiente claridad, así que preferimos no recomendar nada. Se vuelve a probar en cada actualización: conforme crece el historial, esto puede cambiar.</p></div>${stats}`;
+        <p>Probamos las señales con ${p.test_weeks} semanas de historial (${period}), sin mirar el futuro. Para recomendar, la prueba tiene que cumplir las cuatro condiciones; se vuelve a probar en cada actualización.</p>
+        <ul class="checks">${checks.map(([ok, label, need]) => `<li class="${ok ? "ok" : "no"}"><span>${ok ? "✓" : "✗"}</span>${label} <em>(necesita ${need})</em></li>`).join("")}</ul></div>${stats}`;
       list.hidden = true;
       return;
     }
