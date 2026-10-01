@@ -148,6 +148,18 @@
   .radar-sum { padding: 14px 16px; } .radar-sum p { margin: 6px 0 0; color: var(--slate); font-size: 14px; }
   .radar-sum h4 { margin: 0; font-size: 16px; }
   .radar-box ul { margin: 6px 0 0; padding-left: 18px; } .radar-box li { margin: 2px 0; }
+  .season { padding: 14px 12px; }
+  .season p { margin: 0 4px 10px; color: var(--slate); font-size: 14px; }
+  .season-grid { display: grid; grid-template-columns: 92px repeat(12, 1fr); gap: 3px; align-items: center; font-size: 12px; }
+  .season-grid .m { text-align: center; color: var(--slate); }
+  .season-grid .name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .season-grid .c { height: 26px; border-radius: 4px; background: var(--wash); display: flex; align-items: center; justify-content: center; font-size: 10.5px; color: var(--slate); }
+  .season-grid .c.up2 { background: #2B7D52; color: #fff; } .season-grid .c.up1 { background: #BFE0CC; color: #17402b; }
+  .season-grid .c.dn1 { background: #F2D3CF; color: #6b231d; } .season-grid .c.dn2 { background: #B2433A; color: #fff; }
+  .season-grid .c.now { outline: 2px solid var(--ink); outline-offset: -2px; }
+  .season-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 10px 4px 0; color: var(--slate); font-size: 12px; }
+  .season-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  .season-next { margin: 12px 4px 0; padding: 10px 12px; background: var(--good-soft); border-left: 4px solid var(--good); border-radius: 0; font-size: 14px; }
   .checks { list-style: none; margin: 10px 0 0; padding: 0; font-size: 14px; }
   .checks li { display: flex; gap: 8px; padding: 4px 0; } .checks li span { font-weight: 700; width: 14px; flex: none; }
   .checks li.ok span { color: var(--good); } .checks li.no span { color: var(--bad); }
@@ -222,6 +234,8 @@
   <section id="radar-view" hidden>
     <div id="radar-summary"></div>
     <div class="panel list picks" id="radar-list" style="margin-top:12px" hidden></div>
+    <h3 class="section" id="season-title" hidden>Temporadas</h3>
+    <div class="panel season" id="season-box" hidden></div>
     <p class="fine">El radar busca señales que en el pasado solían venir antes de una subida: menos ofertas abiertas, más ventas, tendencia y caídas que se corrigen. Se prueba en cada actualización contra el último año sin mirar el futuro, y solo muestra recomendaciones cuando esa prueba le gana al mercado. Aun así no es una garantía: los precios pueden bajar.</p>
   </section>
 
@@ -771,6 +785,7 @@
     const p = await loadPrediction();
     if (!p) { box.innerHTML = `<div class="panel empty"><strong>El radar todavía no se ha calculado</strong>Aparecerá después de la siguiente actualización.</div>`; list.hidden = true; return; }
     if (p.reason && !p.picks_ret && p.picks_ret !== 0) {
+      renderSeasons(p);
       box.innerHTML = `<div class="panel empty"><strong>Todavía no hay datos suficientes</strong>${esc(p.reason)}</div>`; list.hidden = true; return;
     }
     const period = `${fmtDay(parseDay(p.test_from))} ${parseDay(p.test_from).getFullYear()} a ${fmtDay(parseDay(p.test_to))} ${parseDay(p.test_to).getFullYear()}`;
@@ -778,6 +793,7 @@
         <div><b class="${p.enabled && p.picks_ret > p.market_ret ? "down" : ""}">${pct1(p.picks_ret)}</b><span>Radar, en ${p.horizon_days} días</span></div>
         <div><b>${pct1(p.market_ret)}</b><span>Mercado en general</span></div>
         <div><b>${Math.round(p.beat_share * 100)}%</b><span>Semanas que le ganó</span></div></div>`;
+    renderSeasons(p);
     if (!p.enabled) {
       const excess = p.picks_ret - p.market_ret;
       const checks = [
@@ -800,6 +816,33 @@
     list.innerHTML = rows.map(({ pk, s }) => rowHtml(s, `<div class="sub">${esc(pk.why[0])}</div>`,
       `<div class="delta ${pk.expected > 0 ? "down" : "flat"}" title="Resultado típico de puntajes así en la prueba">${pct1(pk.expected)} típico</div>`)).join("");
     bindRows(list);
+  }
+
+
+  // ---- calendario de temporadas ----
+  function renderSeasons(p) {
+    const title = $("season-title"), box = $("season-box");
+    const rows = (p && p.seasons || []).filter((c) => c.items > 0 && c.months.some((v) => v != null));
+    title.hidden = box.hidden = !rows.length;
+    if (!rows.length) return;
+    const now = new Date(), month = now.getMonth(); // 0 = enero
+    const cls = (v) => v == null ? "" : v >= 0.02 ? "up2" : v >= 0.005 ? "up1" : v <= -0.02 ? "dn2" : v <= -0.005 ? "dn1" : "";
+    const label = (v) => { if (v == null) return "–"; const r = Math.round(v * 100); return r === 0 ? "0" : `${r > 0 ? "+" : "−"}${Math.abs(r)}`; };
+    const head = `<div></div>${MONTHS.map((m, i) => `<div class="m"${i === month ? ' style="color:var(--ink);font-weight:700"' : ""}>${m[0].toUpperCase()}</div>`).join("")}`;
+    const body = rows.map((c) => `<div class="name" title="${esc(c.name)}">${esc(c.name)}</div>` +
+      c.months.map((v, i) => `<div class="c ${cls(v)}${i === month ? " now" : ""}" title="${MONTHS[i]}: ${v == null ? "sin datos" : pct1(v) + " contra el mercado"}">${label(v)}</div>`).join("")).join("");
+    // ¿qué temporada viene? el mes actual o el siguiente con más de +2%
+    const soon = [];
+    rows.forEach((c) => [month, (month + 1) % 12].forEach((m) => {
+      const v = c.months[m];
+      if (v != null && v >= 0.02 && !soon.some((x) => x.c === c)) soon.push({ c, m, v });
+    }));
+    const next = soon.sort((a, b) => b.v - a.v)[0];
+    box.innerHTML = `<p>Cuánto les ganaron (o perdieron) al mercado los furnis de cada tema, en 14 días, según el mes. Los números son porcentajes; el mes actual está remarcado.</p>
+      <div class="season-grid">${head}${body}</div>
+      <div class="season-legend"><span><i style="background:#2B7D52"></i>+2% o más</span><span><i style="background:#BFE0CC"></i>un poco arriba</span><span><i style="background:#F2D3CF"></i>un poco abajo</span><span><i style="background:#B2433A"></i>−2% o menos</span></div>
+      ${next ? `<div class="season-next">Se acerca la temporada de <b>${esc(next.c.name)}</b>: en ${MONTHS[next.m]} sus furnis le ganaron al mercado por ${pct1(next.v)}.</div>` : ""}
+      <p style="margin:12px 4px 0;font-size:13px">Con dos años de historial, cada mes se ha visto una o dos veces: tómalo como una pista, no como una regla. Se recalcula en cada actualización.</p>`;
   }
 
   async function paintRadarBox(key) {
