@@ -2,8 +2,10 @@ name: Recolectar precios
 
 on:
   schedule:
-    - cron: "0 13 * * *"   # 7:00 a. m. hora del centro de México
-    - cron: "0 1 * * *"    # 7:00 p. m. hora del centro de México
+    - cron: "0 7 * * *"
+      timezone: "America/Mexico_City"
+    - cron: "0 19 * * *"
+      timezone: "America/Mexico_City"
   workflow_dispatch:
     inputs:
       completo:
