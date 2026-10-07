@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Publica la carpeta sitio en la rama datos, que es la que muestra GitHub Pages.
-# La rama siempre queda con un solo commit, así el repo no crece cada día.
+# Si el recolector ya preparó varios hoteles, respeta ese árbol; si falta la portada,
+# usa el index.html del repo como respaldo.
 set -euo pipefail
 mensaje="${1:-Datos del $(date -u +%F)}"
-cp index.html sitio/index.html
+if [ ! -f sitio/index.html ]; then
+  cp index.html sitio/index.html
+fi
 cd sitio
 rm -rf .git
 git init --quiet -b datos

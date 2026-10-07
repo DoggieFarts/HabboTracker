@@ -53,14 +53,47 @@ jobs:
       - name: Traer historial de 2 años (habboapi.site)
         continue-on-error: true   # si habboapi.site falla, la página se publica igual
         timeout-minutes: 35
-        run: python -u historial.py --sitio sitio --minutos 30
+        run: |
+          HOTELS=$(python - <<'PY'
+import json
+from pathlib import Path
+cfg = json.loads(Path('avisos.json').read_text(encoding='utf-8'))
+hotels = cfg.get('hoteles') or ([cfg.get('hotel')] if cfg.get('hotel') else ['habbo.es'])
+print(' '.join(h for h in hotels if h))
+PY
+          )
+          i=0
+          for hotel in $HOTELS; do
+            sitio_dir="sitio"
+            if [ "$i" -gt 0 ]; then
+              sitio_dir="sitio/$hotel"
+            fi
+            python -u historial.py --sitio "$sitio_dir" --minutos 30
+            i=$((i + 1))
+          done
 
       - name: Calcular el radar
         continue-on-error: true   # si falla, la página se publica igual
         timeout-minutes: 10
         run: |
           pip install --quiet numpy
-          python -u prediccion.py --sitio sitio
+          HOTELS=$(python - <<'PY'
+import json
+from pathlib import Path
+cfg = json.loads(Path('avisos.json').read_text(encoding='utf-8'))
+hotels = cfg.get('hoteles') or ([cfg.get('hotel')] if cfg.get('hotel') else ['habbo.es'])
+print(' '.join(h for h in hotels if h))
+PY
+          )
+          i=0
+          for hotel in $HOTELS; do
+            sitio_dir="sitio"
+            if [ "$i" -gt 0 ]; then
+              sitio_dir="sitio/$hotel"
+            fi
+            python -u prediccion.py --sitio "$sitio_dir"
+            i=$((i + 1))
+          done
 
       - name: Publicar la página
         env:

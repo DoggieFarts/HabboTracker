@@ -60,7 +60,10 @@
     padding: 4px 2px 12px;
   }
   .wordmark { font: 700 24px/1 var(--display); letter-spacing: .01em; margin: 0; display: inline-flex; align-items: center; gap: 8px; text-transform: uppercase; }
+  .top-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; min-width: 0; }
   .meta { color: var(--muted); font: 500 12px/1.35 var(--display); text-align: right; }
+  .hotel-switch { display: flex; align-items: center; gap: 8px; color: var(--muted); font: 700 11px/1 var(--display); letter-spacing: .04em; text-transform: uppercase; }
+  .hotel-switch .field { width: auto; min-width: 150px; padding: 7px 10px; }
   .coin { width: 10px; height: 10px; flex: none; }
 
   .tabs {
@@ -411,6 +414,9 @@
   @media (max-width: 440px) {
     .wordmark { font-size: 20px; }
     .meta { font-size: 11px; }
+    .top-right { align-items: flex-start; }
+    .meta { text-align: left; }
+    .hotel-switch { flex-direction: column; align-items: flex-start; }
     .tabs button { font-size: 12px; padding: 8px 8px; }
     .stat b { font-size: 24px; }
   }
@@ -423,7 +429,13 @@
 <div class="wrap">
   <header class="top">
     <h1 class="wordmark"><svg class="coin" style="width:16px;height:16px" viewBox="0 0 5 5" shape-rendering="crispEdges"><path fill="#8C5E06" d="M1 0h3v5H1zM0 1h5v3H0z"/><path fill="#D6961A" d="M1 1h3v3H1z"/><path fill="#F6D46B" d="M1 1h1v1H1z"/></svg>Mercadillo</h1>
-    <div class="meta" id="meta">Cargando…</div>
+    <div class="top-right">
+      <div class="meta" id="meta">Cargando…</div>
+      <label class="hotel-switch" id="hotel-switch-wrap" hidden>
+        <span>Hotel</span>
+        <select class="field" id="hotel-switch"></select>
+      </label>
+    </div>
   </header>
 
   <nav class="tabs" role="tablist">
@@ -562,6 +574,12 @@
   const PAGE = 40, MIN_VOLUME = 30; // 30 ventas en 30 días = al menos una al día
   const $ = (id) => document.getElementById(id);
   const fmt = (n) => n == null ? "–" : Number(n).toLocaleString("es-MX");
+  const hotelRoot = (hotels) => {
+    const path = location.pathname.endsWith("/") ? location.pathname : `${location.pathname}/`;
+    for (const hotel of hotels) if (path.endsWith(`/${hotel}/`)) return path.slice(0, -(hotel.length + 1));
+    return path;
+  };
+  const hotelHref = (hotel, hotels) => `${hotelRoot(hotels)}${hotel === hotels[0] ? "" : `${hotel}/`}`;
   const parseDay = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
   const dayKey = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
   const fmtDay = (dt, wd) => `${wd ? WEEKDAYS[dt.getDay()] + " " : ""}${dt.getDate()} ${MONTHS[dt.getMonth()]}`;
@@ -650,6 +668,22 @@
     $("alerts-wrap").hidden = !alerts.length;
     $("alerts").innerHTML = alerts.map((s) => rowHtml(s)).join("");
     bindRows($("alerts"));
+  }
+
+  function setupHotelSwitch() {
+    const hotels = Array.isArray(index?.hoteles) && index.hoteles.length ? index.hoteles.filter(Boolean) : [index?.hotel].filter(Boolean);
+    const wrap = $("hotel-switch-wrap"), sel = $("hotel-switch");
+    if (hotels.length < 2) { wrap.hidden = true; return; }
+    sel.innerHTML = "";
+    hotels.forEach((hotel) => {
+      const opt = document.createElement("option");
+      opt.value = hotel;
+      opt.textContent = hotel;
+      sel.appendChild(opt);
+    });
+    sel.value = index.hotel || hotels[0];
+    sel.onchange = () => { location.href = hotelHref(sel.value, hotels); };
+    wrap.hidden = false;
   }
 
   async function renderList() {
@@ -1269,6 +1303,7 @@
       index = json;
       all = Object.entries(index.items || {}).map(([k, e]) => enrich(k, e));
       $("meta").textContent = `${index.hotel}, ${ago(index.updated)}`;
+      setupHotelSwitch();
       $("hero-count").textContent = fmt(all.length);
       $("market-title").textContent = `Todo el Mercadillo, ${fmt(all.length)} furnis con ventas`;
       // sin bot configurado, las alertas por Telegram no se muestran

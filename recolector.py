@@ -88,6 +88,38 @@ def save_json(path: Path, value) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
 
+def normalize_hotel(value) -> str:
+    return str(value).strip()
+
+
+# noinspection PyTypeChecker
+def configured_hotels(config: dict, requested: str = "") -> list[str]:
+    hotels: list[str] = []
+    if requested and requested in HOTELS:
+        return [requested]
+    raw = config.get("hoteles")
+    if isinstance(raw, dict):
+        for k in raw.keys():
+            # noinspection PyTypeChecker
+            hotels.append(normalize_hotel(k))
+    elif isinstance(raw, list):
+        for h in raw:
+            # noinspection PyTypeChecker
+            hotels.append(normalize_hotel(h))
+    hotels = [h for h in dict.fromkeys(hotels) if h]
+    return hotels or ["habbo.es"]
+
+
+def live_url(config: dict, hotel: str) -> str | None:
+    raw = config.get("en_vivo_url")
+    if isinstance(raw, dict):
+        value = raw.get(hotel)
+    else:
+        value = raw
+    value = str(value or "").strip()
+    return value or None
+
+
 def to_int(value) -> int | None:
     try:
         return int(value)
@@ -216,9 +248,7 @@ def summarize(days: dict[str, list]) -> dict:
 # corrida
 # ---------------------------------------------------------------------------
 
-def run(site: Path, full_scan: bool) -> int:
-    config = load_json(AVISOS, {})
-    hotel = config.get("hotel", "habbo.es")
+def run(site: Path, hotel: str, full_scan: bool, config: dict, hotels: list[str]) -> int:
     if hotel not in HOTELS:
         print(f"Hotel desconocido en avisos.json: {hotel}. Opciones: {', '.join(HOTELS)}")
         return 1
@@ -380,11 +410,11 @@ def run(site: Path, full_scan: bool) -> int:
                                **({"f": launches[key]} if key in launches else {})})
 
     save_json(site / "indice.json", {
-        "hotel": hotel, "fee_pct": config.get("comision_pct", 1),
+        "hotel": hotel, "hoteles": hotels, "fee_pct": config.get("comision_pct", 1),
         "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "targets": targets, "catalog_size": len(catalog), "items": items,
         "bot": (config.get("telegram_bot") or "").lstrip("@") or None,
-        "live": (config.get("en_vivo_url") or "").strip() or None,
+        "live": live_url(config, hotel),
     })
     processed = max(0, done - len(priority))
     scanned = scan_items[processed - 1][0] + 1 if processed else 0  # posiciones del catálogo ya cubiertas
@@ -435,9 +465,19 @@ def open_alert_issues(hits: list[dict]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sitio", default="sitio", help="carpeta donde se guardan los datos y la página")
+    parser.add_argument("--hotel", help="procesar solo este hotel")
     parser.add_argument("--completo", action="store_true", help="revisar todo el catálogo en esta corrida")
     args = parser.parse_args()
-    return run(Path(args.sitio), args.completo)
+    config = load_json(AVISOS, {})
+    hotels = configured_hotels(config, args.hotel or "")
+    if args.hotel and args.hotel not in HOTELS:
+        print(f"Hotel desconocido: {args.hotel}. Opciones: {', '.join(HOTELS)}")
+        return 1
+    exit_code = 0
+    for i, hotel in enumerate(hotels):
+        site = Path(args.sitio) if i == 0 else Path(args.sitio) / hotel
+        exit_code = max(exit_code, run(site, hotel, args.completo, config, hotels))
+    return exit_code
 
 
 if __name__ == "__main__":

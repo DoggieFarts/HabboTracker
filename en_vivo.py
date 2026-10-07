@@ -9,7 +9,8 @@ Mercadillo lo más frescos que Habbo permite.
 
 Solo usa la biblioteca estándar de Python. La configuración viene de /etc/mercadillo.env:
   SITE_URL   dirección de la página, por ejemplo https://usuario.github.io/mercadillo-habbo
-  SALIDA     archivo a escribir (por defecto /var/lib/mercadillo/vivo.json)
+  HOTEL      hotel a seguir; si se omite, toma el que publique la página
+  SALIDA     archivo a escribir (por defecto /var/lib/mercadillo/vivo[-hotel].json)
   TOP        cuántos de los más vendidos se refrescan seguido (por defecto 500)
 """
 
@@ -33,7 +34,8 @@ HOTELS = {
     "habbo.com.tr": "https://www.habbo.com.tr",
 }
 SITE_URL = os.environ.get("SITE_URL", "").rstrip("/")
-OUT = Path(os.environ.get("SALIDA", "/var/lib/mercadillo/vivo.json"))
+HOTEL_ENV = os.environ.get("HOTEL", "").strip()
+OUT = Path(os.environ.get("SALIDA", f"/var/lib/mercadillo/vivo-{HOTEL_ENV}.json" if HOTEL_ENV else "/var/lib/mercadillo/vivo.json"))
 TOP = int(os.environ.get("TOP", "500"))
 BATCH = 20                 # máximo que acepta Habbo por consulta
 BASE_PAUSE = 3.0
@@ -80,7 +82,7 @@ def retry_after(e: urllib.error.HTTPError) -> int | None:
 
 class Live:
     def __init__(self):
-        self.hotel = "habbo.es"
+        self.hotel = HOTEL_ENV or "habbo.es"
         self.top: list[str] = []
         self.rest: list[str] = []
         self.i_top = self.i_rest = 0
