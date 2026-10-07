@@ -53,14 +53,7 @@ jobs:
         continue-on-error: true   # si habboapi.site falla, la página se publica igual
         timeout-minutes: 35
         run: |
-          HOTELS=$(python - <<'PY'
-import json
-from pathlib import Path
-cfg = json.loads(Path('avisos.json').read_text(encoding='utf-8'))
-hotels = cfg.get('hoteles') or ([cfg.get('hotel')] if cfg.get('hotel') else ['habbo.es'])
-print(' '.join(h for h in hotels if h))
-PY
-          )
+          HOTELS=$(python -c "import json; from pathlib import Path; cfg = json.loads(Path('avisos.json').read_text(encoding='utf-8')); hotels = cfg.get('hoteles') or ([cfg.get('hotel')] if cfg.get('hotel') else ['habbo.es']); print(' '.join(h for h in hotels if h))")
           i=0
           for hotel in $HOTELS; do
             sitio_dir="sitio"
@@ -76,14 +69,7 @@ PY
         timeout-minutes: 10
         run: |
           pip install --quiet numpy
-          HOTELS=$(python - <<'PY'
-import json
-from pathlib import Path
-cfg = json.loads(Path('avisos.json').read_text(encoding='utf-8'))
-hotels = cfg.get('hoteles') or ([cfg.get('hotel')] if cfg.get('hotel') else ['habbo.es'])
-print(' '.join(h for h in hotels if h))
-PY
-          )
+          HOTELS=$(python -c "import json; from pathlib import Path; cfg = json.loads(Path('avisos.json').read_text(encoding='utf-8')); hotels = cfg.get('hoteles') or ([cfg.get('hotel')] if cfg.get('hotel') else ['habbo.es']); print(' '.join(h for h in hotels if h))")
           i=0
           for hotel in $HOTELS; do
             sitio_dir="sitio"
