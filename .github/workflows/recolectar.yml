@@ -1,0 +1,82 @@
+name: Recolectar Mercadillo
+
+on:
+  schedule:
+    # 7 a. m. y 7 p. m. hora del centro de México (UTC-6)
+    - cron: "0 13 * * *"
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+    inputs:
+      completo:
+        description: Revisar todo el catálogo en esta corrida
+        type: boolean
+        default: false
+
+concurrency:
+  group: recolectar
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  recolectar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Traer el repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Instalar dependencias
+        run: pip install numpy
+
+      - name: Traer los datos guardados de la rama datos
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p sitio
+          if git ls-remote --exit-code --heads "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" datos >/dev/null 2>&1; then
+            git clone --quiet --depth 1 --branch datos \
+              "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" /tmp/datos
+            cp -a /tmp/datos/. sitio/ || true
+            rm -rf sitio/.git
+            echo "Datos anteriores recuperados."
+          else
+            echo "Todavía no hay rama datos; se empieza de cero."
+          fi
+
+      - name: Rellenar historial largo
+        run: |
+          for hotel in habbo.es habbo.com; do
+            echo "===== historial $hotel ====="
+            python -u historial.py --sitio "sitio/$hotel" || true
+          done
+
+      - name: Consultar el Mercadillo
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          extra=""
+          if [ "${{ inputs.completo }}" = "true" ]; then extra="--completo"; fi
+          for hotel in habbo.es habbo.com; do
+            echo "===== recolector $hotel ====="
+            python -u recolector.py --sitio sitio --hotel "$hotel" $extra
+          done
+
+      - name: Calcular el radar
+        run: |
+          for hotel in habbo.es habbo.com; do
+            echo "===== prediccion $hotel ====="
+            python -u prediccion.py --sitio "sitio/$hotel" || true
+          done
+
+      - name: Publicar la página
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash publicar.sh "Datos del $(date -u +%F)"

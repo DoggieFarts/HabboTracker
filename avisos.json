@@ -1,0 +1,12 @@
+{
+  "hoteles": ["habbo.es", "habbo.com"],
+  "comision_pct": 1,
+  "en_vivo_base": "https://habbotracker-doggiefarts.mexicocentral.cloudapp.azure.com/habbo.es/vivo.json",
+  "telegram_bot": "",
+  "vigia": {
+    "descuento_minimo_pct": 15,
+    "ganancia_minima": 20,
+    "furnis": 200
+  },
+  "avisos": []
+}

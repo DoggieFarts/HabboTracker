@@ -1,0 +1,1304 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060b08">
+<title>Mercadillo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 5 5' shape-rendering='crispEdges'%3E%3Cpath fill='%238C5E06' d='M1 0h3v5H1zM0 1h5v3H0z'/%3E%3Cpath fill='%23D6961A' d='M1 1h3v3H1z'/%3E%3Cpath fill='%23F6D46B' d='M1 1h1v1H1z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060b08;
+    --bg-soft: #0b1410;
+    --panel: #111c16;
+    --panel-2: #16241c;
+    --line: #25362d;
+    --line-strong: #355043;
+    --text: #e8f4ed;
+    --muted: #93a89a;
+    --accent: #9afc58;
+    --accent-2: #4ee588;
+    --danger: #ff7777;
+    --warning: #f6d46b;
+    --good: #6ef19c;
+    --bars: #3f5448;
+    --ink: var(--text);
+    --slate: var(--muted);
+    --pool: var(--accent);
+    --pool-soft: rgba(154,252,88,.14);
+    --gold: var(--warning);
+    --paper: var(--panel);
+    --wash: #0f1a15;
+    --display: ui-monospace, "SFMono-Regular", "Cascadia Code", "Menlo", "Consolas", "Liberation Mono", monospace;
+    --body: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0;
+    min-height: 100%;
+    background: radial-gradient(circle at 20% -10%, #173627 0%, transparent 50%), var(--bg);
+    color: var(--text);
+    font: 15px/1.48 var(--body);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 18px 14px 44px; }
+
+  header.top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 2px 12px;
+  }
+  .wordmark { font: 700 24px/1 var(--display); letter-spacing: .01em; margin: 0; display: inline-flex; align-items: center; gap: 8px; text-transform: uppercase; }
+  .meta { color: var(--muted); font: 500 12px/1.35 var(--display); text-align: right; }
+  .coin { width: 10px; height: 10px; flex: none; }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin: 0 0 14px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 4px;
+    background: rgba(10, 16, 13, .9);
+    backdrop-filter: blur(6px);
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button {
+    flex: 1;
+    min-width: max-content;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font: 600 12.5px/1.2 var(--display);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .tabs button[aria-selected="true"] {
+    background: linear-gradient(180deg, rgba(154,252,88,.2), rgba(154,252,88,.08));
+    border-color: rgba(154,252,88,.35);
+    color: var(--text);
+  }
+
+  .panel {
+    background: linear-gradient(180deg, rgba(23,36,29,.92), rgba(17,28,22,.94));
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+  }
+
+  .hero {
+    padding: 18px;
+    margin-bottom: 14px;
+    display: grid;
+    gap: 14px;
+  }
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    width: fit-content;
+    margin: 0;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(154,252,88,.35);
+    background: rgba(154,252,88,.08);
+    font: 600 11px/1.2 var(--display);
+    letter-spacing: .03em;
+    text-transform: uppercase;
+  }
+  .hero h2 { margin: 0; font: 700 clamp(30px, 8vw, 56px)/1.02 var(--display); letter-spacing: -.02em; }
+  .hero p { margin: 0; color: var(--muted); max-width: 65ch; }
+  .hero-cta { display: flex; flex-wrap: wrap; gap: 10px; }
+  .hero-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+  .hero-metrics article {
+    padding: 10px 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background: rgba(10,17,13,.55);
+  }
+  .hero-metrics b { display: block; font: 700 22px/1 var(--display); color: var(--accent); }
+  .hero-metrics span { color: var(--muted); font-size: 12.5px; }
+
+  h3.section {
+    font: 700 15px/1.3 var(--display);
+    margin: 24px 4px 8px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+  }
+
+  .toolbar { padding: 14px; display: grid; gap: 10px; }
+  .toolbar .note, .fine, .count, .legend, .season-legend, .season-grid .m, .season-grid .c, .season p, .live-top span, .radar-sum p, .aviso p, .result code, .row .sub, .margin, .meta, .insight span, .checks em { color: var(--muted); }
+
+  .seg {
+    display: inline-flex;
+    gap: 3px;
+    padding: 3px;
+    border-radius: 9px;
+    background: rgba(8,13,10,.8);
+    border: 1px solid var(--line);
+  }
+  .seg.full { display: flex; }
+  .seg button {
+    border: 1px solid transparent;
+    border-radius: 7px;
+    padding: 6px 10px;
+    color: var(--muted);
+    background: transparent;
+    font: 600 12.5px/1.2 var(--display);
+    cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] {
+    background: rgba(154,252,88,.14);
+    border-color: rgba(154,252,88,.3);
+    color: var(--text);
+  }
+
+  .field {
+    width: 100%;
+    font: inherit;
+    color: var(--text);
+    background: rgba(4,9,7,.9);
+    border: 1px solid var(--line-strong);
+    border-radius: 9px;
+    padding: 10px 12px;
+  }
+  .field::placeholder { color: #73887c; }
+  .field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+  .list { padding: 6px; }
+  .list-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; padding: 8px 12px 2px; }
+  .row {
+    display: grid;
+    grid-template-columns: 38px 1fr auto;
+    gap: 2px 12px;
+    align-items: center;
+    width: 100%;
+    border: 0;
+    border-radius: 10px;
+    padding: 12px;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .row.with-spark { grid-template-columns: 38px 1fr 64px auto; }
+  .row + .row { border-top: 1px solid rgba(37,54,45,.55); }
+  .row:hover { background: rgba(154,252,88,.05); }
+  .row .thumb, .thumb-slot { grid-row: span 2; width: 38px; height: 38px; }
+  .thumb { object-fit: contain; image-rendering: pixelated; }
+  .row .name { font-weight: 600; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .sub { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .sub.hit { color: var(--accent-2); font-weight: 600; }
+  .row .price { font: 700 20px/1 var(--display); display: flex; align-items: center; gap: 7px; justify-content: flex-end; }
+  .row .delta { font: 600 13px/1.2 var(--display); text-align: right; }
+  .row .left { min-width: 0; }
+  .row .spark { grid-row: span 2; }
+
+  .up { color: var(--danger); }
+  .down { color: var(--good); }
+  .flat { color: var(--muted); }
+
+  .btn {
+    border: 1px solid rgba(154,252,88,.35);
+    border-radius: 9px;
+    padding: 9px 13px;
+    background: linear-gradient(180deg, rgba(154,252,88,.28), rgba(154,252,88,.12));
+    color: var(--text);
+    font: 700 12.5px/1 var(--display);
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+  }
+  .btn:hover { background: linear-gradient(180deg, rgba(154,252,88,.38), rgba(154,252,88,.16)); }
+  .btn.ghost {
+    background: rgba(7, 13, 10, .8);
+    border-color: var(--line-strong);
+    color: var(--accent);
+  }
+  .btn.ghost:hover { border-color: rgba(154,252,88,.4); }
+
+  .more {
+    display: block;
+    width: calc(100% - 12px);
+    margin: 6px;
+    padding: 11px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 9px;
+    background: rgba(4,9,7,.55);
+    color: var(--accent);
+    font: 600 12.5px/1.2 var(--display);
+    cursor: pointer;
+  }
+
+  .deals-cta, .live-top, .radar-sum, .season, .budget, .finder, .chart-panel, .aviso { padding: 14px; }
+  .deals-cta { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .deals-cta div, .live-top div { flex: 1; min-width: 0; }
+  .deals-cta strong, .live-top strong { display: block; font-size: 16px; }
+  .deals-cta span { color: var(--muted); font-size: 13px; }
+  .badge-new { display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 999px; background: rgba(154,252,88,.18); color: var(--accent); font: 700 11px/1.2 var(--display); text-transform: uppercase; letter-spacing: .03em; }
+
+  .summary { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 12px; }
+  .summary div { padding: 12px 14px; }
+  .summary div + div { border-left: 1px solid var(--line); }
+  .summary b { display: block; font: 700 23px/1.1 var(--display); }
+  .summary span { color: var(--muted); font-size: 12.5px; }
+
+  .detail-head { display: flex; gap: 14px; align-items: center; padding: 18px 18px 6px; }
+  .detail-head .big-thumb { width: 64px; height: 64px; object-fit: contain; image-rendering: pixelated; flex: none; }
+  .detail-head h2 { font: 700 clamp(25px, 6vw, 34px)/1.05 var(--display); margin: 0; }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); border-top: 1px solid var(--line); margin-top: 14px; }
+  .stat { padding: 12px 18px 14px; }
+  .stat:nth-child(odd) { border-right: 1px solid var(--line); }
+  .stat:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+  .stat b { display: block; font: 700 28px/1.1 var(--display); }
+  .stat span { font-size: 12.5px; color: var(--muted); }
+  .stat.low b { color: var(--accent); }
+  @media (min-width: 780px) {
+    .stats { grid-template-columns: repeat(4, 1fr); }
+    .stat, .stat:nth-child(odd) { border-right: 1px solid var(--line); border-bottom: 0; }
+    .stat:last-child { border-right: 0; }
+  }
+
+  .insight { margin: 12px 0; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--line); background: rgba(10,17,13,.75); }
+  .insight strong { display: block; margin-bottom: 2px; }
+  .insight.good { border-color: rgba(78,229,136,.35); background: rgba(78,229,136,.08); }
+  .insight.bad { border-color: rgba(255,119,119,.45); background: rgba(255,119,119,.08); }
+
+  .chart-panel { padding-bottom: 10px; }
+  .chart-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 0 4px 8px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; }
+  .legend i { display: inline-block; vertical-align: middle; margin-right: 6px; }
+  .chart { position: relative; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+  .chart svg { display: block; width: 100%; }
+  .tip {
+    position: absolute;
+    top: 6px;
+    pointer-events: none;
+    background: rgba(4,9,7,.96);
+    border: 1px solid var(--line-strong);
+    border-radius: 9px;
+    padding: 8px 12px;
+    font-size: 13px;
+    min-width: 170px;
+    box-shadow: 0 10px 20px rgba(0,0,0,.32);
+  }
+  .tip div { display: flex; justify-content: space-between; gap: 16px; color: var(--muted); }
+  .tip div b { color: var(--text); font: 700 14px var(--display); }
+  .tip .d { font-weight: 700; color: var(--text); margin-bottom: 2px; }
+  .margin { padding: 12px 16px; margin-top: 12px; font-size: 14px; }
+  .margin b.pos { color: var(--good); }
+  .margin b.neg { color: var(--danger); }
+
+  .back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 0;
+    background: transparent;
+    color: var(--accent);
+    font: 600 13px/1.2 var(--display);
+    padding: 8px 4px;
+    margin: 0 0 6px;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+
+  .season-grid { display: grid; grid-template-columns: 92px repeat(12, 1fr); gap: 3px; align-items: center; font-size: 12px; }
+  .season-grid .name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .season-grid .c { height: 26px; border-radius: 4px; background: rgba(8,13,10,.7); display: flex; align-items: center; justify-content: center; font-size: 10.5px; }
+  .season-grid .c.up2 { background: #3ba66e; color: #e8f4ed; }
+  .season-grid .c.up1 { background: #2e6a4c; color: #dbf8e8; }
+  .season-grid .c.dn1 { background: #6f4848; color: #ffe8e8; }
+  .season-grid .c.dn2 { background: #a34848; color: #fff1f1; }
+  .season-grid .c.now { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .season-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 10px 4px 0; font-size: 12px; }
+  .season-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  .season-next { margin: 12px 4px 0; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(78,229,136,.35); background: rgba(78,229,136,.08); font-size: 14px; }
+
+  .checks { list-style: none; margin: 10px 0 0; padding: 0; font-size: 14px; }
+  .checks li { display: flex; gap: 8px; padding: 4px 0; }
+  .checks li span { font-weight: 700; width: 14px; flex: none; }
+  .checks li.ok span { color: var(--good); }
+  .checks li.no span { color: var(--danger); }
+
+  .aviso { margin-top: 12px; }
+  .aviso .line, .budget .line { display: flex; gap: 8px; }
+  .aviso .line .field, .budget .line .field { flex: 1; min-width: 0; }
+  .budget { display: grid; gap: 10px; }
+  .budget label { font-weight: 600; font-size: 14px; }
+
+  .result { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 4px; border-top: 1px solid var(--line); }
+  .result .n { font-weight: 600; }
+  .copy {
+    flex: none;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    padding: 6px 10px;
+    background: rgba(154,252,88,.12);
+    color: var(--accent);
+    font: 600 12.5px/1 var(--display);
+    cursor: pointer;
+  }
+
+  .empty { padding: 28px 20px; text-align: center; color: var(--muted); }
+  .empty strong { display: block; color: var(--text); font-size: 16px; margin-bottom: 4px; }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    background: rgba(5, 9, 7, .98);
+    color: var(--text);
+    border: 1px solid var(--line-strong);
+    padding: 10px 16px;
+    border-radius: 9px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity .2s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  [hidden] { display: none !important; }
+
+  .live-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: var(--accent-2);
+    margin-right: 6px;
+    vertical-align: 1px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 0 rgba(78,229,136,.45);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: .38; box-shadow: 0 0 0 7px rgba(78,229,136,0); } }
+
+  .alerts .row .sub, .picks .sub { white-space: normal; }
+  .inactive { opacity: .85; }
+  .no-alerts .copy { display: none; }
+
+  @media (max-width: 900px) {
+    .wrap { max-width: 760px; }
+    .hero h2 { letter-spacing: -.01em; }
+  }
+  @media (max-width: 680px) {
+    .wrap { padding: 14px 12px 36px; }
+    .summary { grid-template-columns: 1fr; }
+    .summary div + div { border-left: 0; border-top: 1px solid var(--line); }
+    .deals-cta, .live-top { flex-direction: column; align-items: stretch; }
+    .deals-cta .btn, .live-top .btn { width: 100%; }
+    .hero { padding: 14px; }
+    .row.with-spark { grid-template-columns: 38px 1fr auto; }
+    .row .spark { display: none; }
+  }
+  @media (max-width: 440px) {
+    .wordmark { font-size: 20px; }
+    .meta { font-size: 11px; }
+    .tabs button { font-size: 12px; padding: 8px 8px; }
+    .stat b { font-size: 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1 class="wordmark"><svg class="coin" style="width:16px;height:16px" viewBox="0 0 5 5" shape-rendering="crispEdges"><path fill="#8C5E06" d="M1 0h3v5H1zM0 1h5v3H0z"/><path fill="#D6961A" d="M1 1h3v3H1z"/><path fill="#F6D46B" d="M1 1h1v1H1z"/></svg>Mercadillo</h1>
+    <div class="meta" id="meta">Cargando…</div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-view="market" aria-selected="true">Mercado</button>
+    <button role="tab" data-view="live" aria-selected="false" id="tab-live" hidden><span class="live-dot"></span>En vivo</button>
+    <button role="tab" data-view="radar" aria-selected="false">Radar</button>
+    <button role="tab" data-view="launches" aria-selected="false">Lanzamientos<span id="tab-launch-dot" hidden style="display:inline-block;width:7px;height:7px;background:var(--gold);margin-left:6px;vertical-align:2px"></span></button>
+    <button role="tab" data-view="budget" aria-selected="false">Presupuesto</button>
+    <span class="seg" id="hotel-pick" hidden style="margin-left:auto"></span>
+  </nav>
+
+  <main id="list-view">
+    <section class="panel hero" aria-label="Resumen del tracker">
+      <p class="status-pill"><span class="live-dot" aria-hidden="true"></span>Estado del tracker</p>
+      <h2>Opera el Mercadillo con señales claras y datos en tiempo real.</h2>
+      <p>Consulta oportunidades, vigila cambios de precio y decide tus compras con una lectura rápida del mercado, el radar y el historial de cada furni.</p>
+      <div class="hero-cta">
+        <button class="btn" id="hero-market" type="button">Ver mercado</button>
+        <button class="btn ghost" id="hero-radar" type="button">Abrir radar</button>
+      </div>
+      <div class="hero-metrics" aria-label="Métricas destacadas">
+        <article><b id="hero-count">—</b><span>Furnis con datos recientes</span></article>
+        <article><b>24/7</b><span>Seguimiento continuo del mercado</span></article>
+        <article><b>+30d</b><span>Historial y comparación de tendencia</span></article>
+      </div>
+    </section>
+    <section id="alerts-wrap" hidden>
+      <h3 class="section" style="margin-top:0">Tus avisos</h3>
+      <div class="panel list alerts" id="alerts"></div>
+    </section>
+
+    <div class="panel deals-cta">
+      <div><strong>Gangas en tu Telegram</strong><span>Te avisamos cuando algo muy vendido aparece muy por debajo de su precio justo.</span></div>
+      <button class="btn" id="deals-link">Activar</button>
+    </div>
+
+    <h3 class="section" id="market-title">Todo el Mercadillo</h3>
+    <div class="panel toolbar">
+      <input class="field" id="q" type="search" placeholder="Busca entre todos los furnis del hotel" autocomplete="off">
+      <div class="seg full" id="sort">
+        <button data-sort="deals" aria-pressed="true">Oportunidades</button>
+        <button data-sort="volume" aria-pressed="false">Más vendidos</button>
+        <button data-sort="pricey" aria-pressed="false">Más caros</button>
+      </div>
+      <p class="note" id="sort-note"></p>
+    </div>
+    <div class="panel list" id="list" style="margin-top:12px"></div>
+  </main>
+
+  <section id="live-view" hidden>
+    <div id="live-summary"></div>
+    <div class="panel list picks" id="live-list" style="margin-top:12px" hidden></div>
+    <p class="fine">Solo aparecen furnis cuyo precio se confirmó en los últimos 15 minutos y que están por debajo de su rango normal, se venden al menos una vez al día y se pueden revender en menos de un mes. Las gangas duran poco: revisa el Mercadillo antes de comprar.</p>
+  </section>
+
+  <section id="radar-view" hidden>
+    <div id="radar-summary"></div>
+    <div class="panel list picks" id="radar-list" style="margin-top:12px" hidden></div>
+    <h3 class="section" id="season-title" hidden>Temporadas</h3>
+    <div class="panel season" id="season-box" hidden></div>
+    <p class="fine">El radar busca señales que en el pasado solían venir antes de una subida: menos ofertas abiertas, más ventas, tendencia y caídas que se corrigen. Se prueba en cada actualización contra el último año sin mirar el futuro, y solo muestra recomendaciones cuando esa prueba le gana al mercado. Aun así no es una garantía: los precios pueden bajar.</p>
+  </section>
+
+  <section id="launches-view" hidden>
+    <p class="fine" style="margin-top:0">Furnis que aparecieron en el catálogo en los últimos 30 días. Muchos bajan después de los primeros días: compara la oferta de hoy con su máximo.</p>
+    <div class="panel list" id="launches" style="margin-top:10px"></div>
+  </section>
+
+  <section id="budget-view" hidden>
+    <div class="panel budget">
+      <label for="budget">¿Cuántos créditos quieres invertir?</label>
+      <div class="line">
+        <input class="field" id="budget" type="number" inputmode="numeric" min="1" placeholder="Por ejemplo 1500">
+        <button class="btn" id="budget-go">Armar lista</button>
+      </div>
+      <label>¿En cuánto tiempo quieres poder revenderlos?</label>
+      <div class="seg full" id="budget-days">
+        <button data-days="3" aria-pressed="false">3 días</button>
+        <button data-days="7" aria-pressed="true">1 semana</button>
+        <button data-days="14" aria-pressed="false">2 semanas</button>
+      </div>
+    </div>
+    <div id="budget-out"></div>
+  </section>
+
+  <section id="detail-view" hidden>
+    <button class="back" id="back">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 3 5 8l5 5"/></svg>Volver
+    </button>
+    <div class="panel">
+      <div class="detail-head">
+        <img class="big-thumb" id="d-img" alt="">
+        <div><h2 id="d-name"></h2><div class="meta" id="d-meta"></div></div>
+      </div>
+      <div class="stats">
+        <div class="stat low"><b id="s-low">–</b><span>Oferta más baja ahora</span></div>
+        <div class="stat"><b id="s-fair">–</b><span>Precio justo</span></div>
+        <div class="stat"><b id="s-day">–</b><span>Vendidos por día</span></div>
+        <div class="stat"><b id="s-dr">–</b><span>Días para revender</span></div>
+      </div>
+    </div>
+    <div class="insight" id="insight"><strong></strong><span></span></div>
+    <div class="insight good radar-box" id="radar-box" hidden><strong></strong><ul></ul></div>
+    <div class="panel chart-panel">
+      <div class="chart-bar">
+        <div class="legend">
+          <span><i style="width:16px;height:3px;background:var(--gold)"></i>Promedio</span>
+          <span><i style="width:7px;height:7px;background:var(--pool)"></i>Oferta más baja</span>
+          <span><i style="width:5px;height:10px;background:var(--bars)"></i>Vendidos</span>
+          <span><i style="width:12px;height:9px;background:rgba(154,252,88,.18);border:1px solid rgba(154,252,88,.35)"></i>Rango normal</span>
+        </div>
+        <div class="seg" id="range">
+          <button data-days="7" aria-pressed="false">7 d</button>
+          <button data-days="30" aria-pressed="true">30 d</button>
+          <button data-days="90" aria-pressed="false">90 d</button>
+          <button data-days="0" aria-pressed="false">Todo</button>
+        </div>
+      </div>
+      <div class="chart" id="chart"></div>
+    </div>
+    <div class="panel margin" id="margin"></div>
+    <div class="panel aviso">
+      <p id="aviso-text">¿A qué precio te gustaría comprarlo? Te avisamos por Telegram cuando alguien lo venda a ese precio o menos.</p>
+      <div class="line">
+        <input class="field" id="aviso-price" type="number" inputmode="numeric" min="1" placeholder="Precio en créditos">
+        <button class="btn" id="aviso-copy">Avisarme en Telegram</button>
+      </div>
+      <p class="fine" id="aviso-note" style="margin:8px 0 0">Se abre Telegram con tu alerta lista: solo toca Iniciar. La confirmación llega en unos minutos.</p>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+(() => {
+  const MONTHS = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  const WEEKDAYS = ["dom","lun","mar","mié","jue","vie","sáb"];
+  const PAGE = 40, MIN_VOLUME = 30; // 30 ventas en 30 días = al menos una al día
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => n == null ? "–" : Number(n).toLocaleString("es-MX");
+  const parseDay = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const dayKey = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  const fmtDay = (dt, wd) => `${wd ? WEEKDAYS[dt.getDay()] + " " : ""}${dt.getDate()} ${MONTHS[dt.getMonth()]}`;
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const norm = (s) => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const fileName = (cls) => cls.replace(/\*/g, "~").replace(/[^A-Za-z0-9_.\-~]/g, "-");
+  const kindName = (t) => t === "wall" ? "pared" : "piso";
+  const COIN = '<svg class="coin" viewBox="0 0 5 5" shape-rendering="crispEdges"><path fill="#8C5E06" d="M1 0h3v5H1zM0 1h5v3H0z"/><path fill="#D6961A" d="M1 1h3v3H1z"/><path fill="#F6D46B" d="M1 1h1v1H1z"/></svg>';
+  const SORT_NOTES = {
+    deals: "Por debajo de su rango normal de precio, entre los que se venden al menos una vez al día y se pueden revender en menos de un mes.",
+    volume: "Los que más se venden: son los más fáciles de revender.",
+    pricey: "Por encima de su rango normal, entre los que se venden seguido. Buen momento para vender si tienes uno.",
+  };
+
+  let index = null, all = [], catalog = null, sortMode = "deals", shown = PAGE, current = null, rangeDays = 30;
+  let view = "market", budgetDays = 7;
+  // Ruta base según el hotel elegido. En la raíz queda vacía.
+      const HOTEL = "__HOTEL__";
+      const MULTI = HOTEL.includes("__");  // en la raíz queda el marcador sin sustituir
+      const BASE = MULTI ? "" : `${HOTEL}/`;
+  const IMG = (cls) => `https://habboapi.site/api/image/${encodeURIComponent(cls)}`;
+  const thumb = (cls) => `<img class="thumb" loading="lazy" alt="" src="${IMG(cls)}" onerror="this.style.visibility='hidden'">`;
+  const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+                  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+  const daysAgo = (iso) => Math.max(0, Math.floor((Date.now() - parseDay(iso)) / 86400000));
+
+  function toast(text) {
+    const t = $("toast"); t.textContent = text; t.classList.add("show");
+    clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove("show"), 2400);
+  }
+  function ago(iso) {
+    if (!iso) return "sin actualizar";
+    const mins = Math.round((Date.now() - new Date(iso)) / 60000);
+    if (mins < 60) return `actualizado hace ${Math.max(1, mins)} min`;
+    if (mins < 1440) return `actualizado hace ${Math.round(mins / 60)} h`;
+    return `actualizado hace ${Math.round(mins / 1440)} días`;
+  }
+
+  function enrich(key, e) {
+    const target = 0; // las alertas ahora son personales y viven en el bot de Telegram
+    // si el precio justo guardado no cuadra con lo que se vendió en el último mes (más del triple o menos
+    // de un tercio de la mediana diaria), se toma como dato equivocado y se usa la mediana de esas ventas
+    const sp = (e.sp || []).filter(Boolean).slice().sort((x, y) => x - y);
+    const spMed = sp.length >= 5 ? sp[Math.floor(sp.length / 2)] : null;
+    const last10 = (e.sp || []).filter(Boolean).slice(-10).sort((x, y) => x - y);
+    const lastMed = last10.length >= 5 ? last10[Math.floor(last10.length / 2)] : null;
+    const suspicious = !!(e.m && ((spMed && (e.m > spMed * 3 || e.m < spMed / 3)) ||
+                                  (lastMed && (e.m > lastMed * 2 || e.m < lastMed / 2))));
+    const fair = suspicious ? (lastMed || spMed) : (e.m || e.a || null);
+    const hasFair = !!e.m && !suspicious; // solo la mediana revisada es confiable para recomendar
+    const delta = e.p && fair ? (e.p - fair) / fair : null;
+    return { key, name: e.n, cls: e.c, kind: e.t, price: e.p, avg: e.a, fair, hasFair, low: suspicious ? null : e.l, high: suspicious ? null : e.h,
+             sold: e.s || 0, perDay: (e.s || 0) / 30, offers: e.o,
+             // furnis guardados por versiones anteriores no traen "dr": se calcula aquí con ofertas y ventas
+             dr: e.o ? (e.dr ?? (e.s ? Math.round(e.o / (e.s / 30) * 10) / 10 : null)) : null, launched: e.f || null,
+             spark: e.sp || [], target, delta, hit: !!(target && e.p && e.p <= target) };
+  }
+  function deltaText(d) {
+    if (d == null) return { cls: "flat", text: "", short: "" };
+    const cls = d <= -0.05 ? "down" : d >= 0.05 ? "up" : "flat";
+    const pct = `${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.abs(d * 100).toFixed(0)}%`;
+    return { cls, text: `${pct} vs precio justo`, short: pct };
+  }
+  function sparkSvg(values) {
+    if (values.length < 2) return "";
+    const w = 64, h = 26, lo = Math.min(...values), hi = Math.max(...values), span = hi - lo || 1;
+    const pts = values.map((v, i) => `${(w * i / (values.length - 1)).toFixed(1)},${(h - 2 - (h - 4) * (v - lo) / span).toFixed(1)}`);
+    return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts.join(" ")}" fill="none" stroke="#9afc58" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+  }
+  const perDayText = (s) => s.perDay >= 1 ? `${fmt(Math.round(s.perDay))} al día` : `${fmt(s.sold)} en 30 días`;
+  const drText = (s) => s.dr == null ? "" : s.dr < 1 ? ", se revende en horas"
+    : Math.round(s.dr) === 1 ? ", 1 día para revender" : `, ${fmt(Math.round(s.dr))} días para revender`;
+  function rowHtml(s, subOverride, rightOverride) {
+    const d = deltaText(s.delta), spark = sparkSvg(s.spark);
+    const sub = subOverride || (s.hit ? `<div class="sub hit">Llegó a tu aviso de ${fmt(s.target)}</div>`
+      : s.target ? `<div class="sub">Aviso en ${fmt(s.target)}, ${perDayText(s)}</div>`
+      : `<div class="sub">${perDayText(s)}${drText(s)}</div>`);
+    const right = rightOverride || `<div class="delta ${d.cls}" title="${d.text}">${d.short}</div>`;
+    return `<button class="row${spark ? " with-spark" : ""}" data-key="${esc(s.key)}">${thumb(s.cls)}
+      <div class="left"><div class="name">${esc(s.name)}</div>${sub}</div>${spark}
+      <div><div class="price">${s.price ? COIN + fmt(s.price) : "–"}</div>${right}</div></button>`;
+  }
+  function bindRows(el) {
+    el.querySelectorAll(".row[data-key]").forEach((b) => b.addEventListener("click", () => { location.hash = encodeURIComponent(b.dataset.key); }));
+  }
+
+  // ---- lista ----
+  function renderAlerts() {
+    const alerts = all.filter((s) => s.target).sort((a, b) => (b.hit - a.hit) || (a.delta ?? 9) - (b.delta ?? 9));
+    $("alerts-wrap").hidden = !alerts.length;
+    $("alerts").innerHTML = alerts.map((s) => rowHtml(s)).join("");
+    bindRows($("alerts"));
+  }
+
+  async function renderList() {
+    const q = norm($("q").value.trim());
+    let rows = all;
+    if (q) rows = rows.filter((s) => norm(s.name).includes(q) || s.cls.toLowerCase().includes(q));
+    const needVolume = !q;
+    // en furnis de 2 o 3 créditos, un crédito de diferencia parece un -50%: se ignoran esas diferencias mínimas
+    const meaningful = (s) => s.hasFair && s.fair >= 10 && Math.abs(s.price - s.fair) >= 3;
+    // una oportunidad tiene que estar por debajo de su rango normal, no solo un poco abajo del precio justo
+    const belowNormal = (s) => s.low ? s.price < s.low : s.delta <= -0.10;
+    const aboveNormal = (s) => s.high ? s.price > s.high : s.delta >= 0.10;
+    if (sortMode === "deals") rows = rows.filter((s) => s.delta != null && (!needVolume || (s.sold >= MIN_VOLUME && meaningful(s) && belowNormal(s) && (s.dr == null || s.dr <= 30)))).sort((a, b) => a.delta - b.delta);
+    else if (sortMode === "pricey") rows = rows.filter((s) => s.delta != null && (!needVolume || (s.sold >= MIN_VOLUME && meaningful(s) && aboveNormal(s)))).sort((a, b) => b.delta - a.delta);
+    else rows = [...rows].sort((a, b) => b.sold - a.sold);
+    $("sort-note").textContent = q ? `${fmt(rows.length)} con ventas recientes. Abajo aparecen también los que no se han vendido.` : SORT_NOTES[sortMode];
+
+    let html = rows.slice(0, shown).map((s) => rowHtml(s)).join("");
+    if (rows.length > shown) html += `<button class="more" id="more">Ver ${Math.min(PAGE, rows.length - shown)} más de ${fmt(rows.length - shown)}</button>`;
+
+    // al buscar, también se muestran los furnis del catálogo completo que no han tenido ventas
+    if (q.length >= 2) {
+      const cat = await loadCatalog();
+      const have = new Set(all.map((s) => s.key));
+      const matches = cat.filter(([n, c, t]) => !have.has(`${t}:${c}`) && (norm(n).includes(q) || c.toLowerCase().includes(q)));
+      const extra = matches.slice(0, 15);
+      if (extra.length) html += `<div class="list-head"><span>Sin ventas en los últimos 30 días</span><span>${fmt(matches.length)}</span></div>`;
+      html += extra.map(([n, c, t]) => `<div class="row inactive">${thumb(c)}<div class="left"><div class="name">${esc(n)}</div>
+        <div class="sub">${esc(c)}, furni de ${kindName(t)}</div></div>
+        <button class="copy" data-key="${esc(`${t}:${c}`)}" data-name="${esc(n)}">Crear alerta</button></div>`).join("");
+    }
+    if (!html) html = `<div class="empty"><strong>Sin resultados</strong>Prueba con otra parte del nombre.</div>`;
+    $("list").innerHTML = html;
+    bindRows($("list"));
+    const more = $("more");
+    if (more) more.addEventListener("click", () => { shown += PAGE; renderList(); });
+  }
+
+  async function loadCatalog() {
+    if (catalog) return catalog;
+    try { catalog = (await (await fetch(`${BASE}catalogo.json`)).json()).furnis || []; } catch { catalog = []; }
+    return catalog;
+  }
+
+  // ---- detalle ----
+  function insightFor(s) {
+    const d = s.delta, pct = d == null ? 0 : Math.abs(d * 100).toFixed(0);
+    const slow = s.dr != null && s.dr > 14;
+    const drNote = s.dr == null ? "" : slow
+      ? ` Ojo: hay muchas ofertas abiertas para lo que se vende, podrías tardar unos ${fmt(Math.round(s.dr))} días en revenderlo.`
+      : ` Con ${fmt(s.offers)} ofertas abiertas, revenderlo tomaría unos ${fmt(Math.max(1, Math.round(s.dr)))} días.`;
+    if (!s.price) return ["", "Nadie lo está vendiendo en este momento",
+      (s.fair ? `Su precio justo es de ${fmt(s.fair)} créditos. ` : "") +
+      (s.sold ? `Se venden unas ${s.perDay >= 1 ? fmt(Math.round(s.perDay)) + " al día" : fmt(s.sold) + " al mes"}, así que las ofertas suelen durar poco: si alguien publica uno cerca de su precio justo, conviene revisarlo rápido.`
+              : "Todavía no hay ventas suficientes para calcular su precio justo.")];
+    if (s.hit) return ["good", "Llegó a tu precio", `La oferta más baja es de ${fmt(s.price)} créditos y tu aviso está en ${fmt(s.target)}. Revisa el Mercadillo antes de que alguien más la tome.`];
+    if (d == null) return ["", "Todavía sin precio justo", "Hace falta más historial de ventas para compararlo."];
+    const belowRange = s.low ? s.price < s.low : d <= -0.10, aboveRange = s.high ? s.price > s.high : d >= 0.10;
+    const range = s.low && s.high ? ` (${fmt(s.low)} a ${fmt(s.high)})` : "";
+    if (belowRange && s.perDay >= 1) return [slow ? "" : "good", `${pct}% abajo de su precio justo`,
+      `Está por debajo de su rango normal${range} y se venden unas ${fmt(Math.round(s.perDay))} al día.` + drNote];
+    if (belowRange) return ["", "Barato, pero se mueve poco", `Está ${pct}% abajo de su precio justo, aunque solo se vendieron ${fmt(s.sold)} en 30 días.` + drNote];
+    if (aboveRange) return ["bad", `${pct}% arriba de su precio justo`, `Está por encima de su rango normal${range}. No es buen momento para comprar; si tienes uno, puede ser buen momento para venderlo.`];
+    const side = d >= 0.05 ? ` Está ${pct}% arriba de su precio justo (${fmt(s.fair)}), pero sus precios varían mucho.`
+               : d <= -0.05 ? ` Está ${pct}% abajo de su precio justo (${fmt(s.fair)}), pero todavía dentro de lo normal.` : "";
+    return ["", "En su rango normal", (range ? `Su rango normal va de ${fmt(s.low)} a ${fmt(s.high)} créditos.` : "") + side + " Nada urgente." + drNote];
+  }
+
+  async function renderDetail(key) {
+    const e = index.items[key];
+    if (!e) { location.hash = ""; return; }
+    const s = enrich(key, e);
+    applyLiveTo(s);
+    current = { ...s, days: null };
+    paintRadarBox(key);
+    $("d-name").textContent = s.name;
+    const img = $("d-img"); img.style.visibility = "visible"; img.onerror = () => { img.style.visibility = "hidden"; }; img.src = IMG(s.cls);
+    $("d-meta").textContent = `${s.cls} en ${index.hotel}, furni de ${kindName(s.kind)}` +
+      (s.launched ? `, salió hace ${fmt(daysAgo(s.launched))} días` : "");
+    paintSummary(s);
+    $("aviso-price").value = s.price ? Math.max(1, Math.round(Math.min(s.price, s.fair || s.price) * 0.9)) : "";
+    $("chart").innerHTML = `<div class="empty">Cargando historial…</div>`;
+    window.scrollTo(0, 0);
+    try {
+      const r = await fetch(`${BASE}h/${s.kind}/${encodeURIComponent(fileName(s.cls))}.json?v=${encodeURIComponent(index.updated || "")}`);
+      const hist = r.ok ? await r.json() : { d: {} };
+      if (!(current && current.key === key)) return;
+      current.days = hist.d || {};
+      // datos guardados por versiones anteriores: el precio justo y el rango se calculan aquí con el historial
+      const st = statsFromDays(current.days);
+      const off = st.fair && current.fair && (current.fair > st.fair * 2 || current.fair < st.fair / 2);
+      if (!e.m || !e.l || !e.h || off) {
+        if (st.fair) {
+          Object.assign(current, { fair: st.fair, low: st.low, high: st.high, hasFair: true,
+                                   delta: current.price ? (current.price - st.fair) / st.fair : null });
+          paintSummary(current);
+        }
+      }
+      drawChart();
+    } catch { $("chart").innerHTML = `<div class="empty">No se pudo cargar el historial.</div>`; }
+  }
+
+  function weightedPct(pairs, q) {
+    const sorted = pairs.filter(([p, w]) => p && w).sort((a, b) => a[0] - b[0]);
+    const total = sorted.reduce((a, [, w]) => a + w, 0);
+    if (!total) return null;
+    let acc = 0;
+    for (const [p, w] of sorted) { acc += w; if (acc >= q * total) return p; }
+    return sorted[sorted.length - 1][0];
+  }
+  function statsFromDays(days) {
+    const withAvg = Object.keys(days).filter((d) => days[d][0]).sort();
+    if (!withAvg.length) return {};
+    const last = parseDay(withAvg[withAvg.length - 1]);
+    const since = dayKey(new Date(last.getFullYear(), last.getMonth(), last.getDate() - 29));
+    const pairs = withAvg.filter((d) => d >= since).map((d) => [days[d][0], days[d][1] || 0]);
+    let out = { fair: weightedPct(pairs, 0.5), low: weightedPct(pairs, 0.25), high: weightedPct(pairs, 0.75) };
+    // mismas protecciones que el recolector: si el precio cambió de nivel hace poco, se sigue a los
+    // últimos días; si un solo día raro dominaba el cálculo, se usan los días sin pesar por ventas
+    const plain = pairs.map(([p]) => p).sort((x, y) => x - y);
+    const latest = pairs.slice(-10).map(([p]) => p).sort((x, y) => x - y);
+    const pick = (arr) => ({ fair: arr[Math.floor(arr.length / 2)], low: arr[Math.floor(arr.length / 4)], high: arr[Math.floor(arr.length * 3 / 4)] });
+    const mid = (arr) => arr[Math.floor(arr.length / 2)];
+    if (out.fair && latest.length >= 5 && (out.fair > mid(latest) * 2 || out.fair < mid(latest) / 2)) out = pick(latest);
+    else if (out.fair && plain.length >= 5 && (out.fair > mid(plain) * 3 || out.fair < mid(plain) / 3)) out = pick(plain);
+    return out;
+  }
+
+  function paintSummary(s) {
+    $("s-low").textContent = fmt(s.price);
+    const when = s.liveAt ? `, en vivo hace ${agoShort(Date.now() / 1000 - s.liveAt)}` : "";
+    $("s-low").nextElementSibling.textContent = s.price ? `Oferta más baja${when || " ahora"}` : `Sin ofertas publicadas${when}`;
+    $("s-fair").textContent = fmt(s.fair);
+    $("s-day").textContent = s.perDay >= 1 ? fmt(Math.round(s.perDay)) : s.sold ? (s.perDay).toFixed(1) : "0";
+    $("s-dr").textContent = s.dr == null ? "–" : s.dr < 1 ? "<1" : fmt(Math.round(s.dr));
+    const [tone, head, body] = insightFor(s);
+    const box = $("insight"); box.className = "insight " + tone;
+    box.querySelector("strong").textContent = head; box.querySelector("span").textContent = body;
+    const fee = Number(index.fee_pct ?? 1);
+    if (s.price && s.fair) {
+      const net = Math.round(s.fair * (1 - fee / 100) - s.price);
+      $("margin").innerHTML = net > 0
+        ? `Si compras a ${fmt(s.price)} y revendes a su precio justo (${fmt(s.fair)}), te quedan <b class="pos">+${fmt(net)}</b> créditos netos con ${fee}% de comisión.`
+        : `Comprar a ${fmt(s.price)} y revender a su precio justo (${fmt(s.fair)}) <b class="neg">no deja ganancia</b> después de ${fee}% de comisión.`;
+    } else $("margin").textContent = "El margen aparece cuando hay una oferta abierta y un precio justo.";
+  }
+
+  function niceStep(raw) {
+    if (raw <= 0) return 1;
+    const mag = 10 ** Math.floor(Math.log10(raw));
+    for (const m of [1, 2, 2.5, 5, 10]) if (raw <= m * mag) return Math.max(1, m * mag);
+    return 10 * mag;
+  }
+
+  function drawChart() {
+    const host = $("chart"), s = current;
+    const keys = s && s.days ? Object.keys(s.days).sort() : [];
+    if (!keys.length) { host.innerHTML = `<div class="empty">Todavía no hay historial.</div>`; return; }
+    const lastDay = parseDay(keys[keys.length - 1]), firstDay = parseDay(keys[0]);
+    let start = rangeDays ? new Date(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate() - rangeDays + 1) : firstDay;
+    if (start < firstDay) start = firstDay;
+    const pts = [];
+    for (let dt = new Date(start); dt <= lastDay; dt.setDate(dt.getDate() + 1)) {
+      const v = s.days[dayKey(dt)] || [];
+      pts.push({ day: new Date(dt), avg: v[0] || null, sold: v[1] || 0, offers: v[2] ?? null, low: v[3] || null });
+    }
+    // con más de 4 meses se agrupa por semana, si no la gráfica queda ilegible
+    let weekly = false;
+    if (pts.length > 120) {
+      weekly = true;
+      const agg = [];
+      for (let i = 0; i < pts.length; i += 7) {
+        const wk = pts.slice(i, i + 7), withAvg = wk.filter((p) => p.avg);
+        const weight = withAvg.reduce((a, p) => a + (p.sold || 1), 0);
+        const lows = wk.map((p) => p.low).filter(Boolean);
+        agg.push({ day: wk[0].day, avg: withAvg.length ? Math.round(withAvg.reduce((a, p) => a + p.avg * (p.sold || 1), 0) / weight) : null,
+                   sold: wk.reduce((a, p) => a + p.sold, 0), low: lows.length ? Math.min(...lows) : null,
+                   offers: [...wk].reverse().find((p) => p.offers != null)?.offers ?? null });
+      }
+      pts.length = 0; pts.push(...agg);
+    }
+    const withYear = (lastDay - start) / 86400000 > 300 || start.getFullYear() !== lastDay.getFullYear();
+    const axisLabel = (d) => withYear ? `${MONTHS[d.getMonth()]} ${d.getFullYear()}` : fmtDay(d);
+    const values = pts.flatMap((p) => [p.avg, p.low]).filter(Boolean);
+    if (s.target) values.push(s.target);
+    if (!values.length) { host.innerHTML = `<div class="empty">No hay ventas en este periodo.</div>`; return; }
+    if (s.low && s.high) values.push(s.low, s.high);
+
+    const W = host.clientWidth || 600, H = Math.round(Math.min(300, Math.max(220, W * 0.55)));
+    const L = 46, R = 10, T = 12, B = 24, VOL = 38, GAP = 10;
+    const plotH = H - T - B - VOL - GAP, plotW = W - L - R, volTop = T + plotH + GAP;
+    let lo = Math.min(...values), hi = Math.max(...values);
+    if (lo === hi) { lo *= 0.95; hi *= 1.05; }
+    const step = niceStep((hi - lo) / 4);
+    lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+    const y = (v) => T + plotH - plotH * (v - lo) / (hi - lo);
+    const n = pts.length, w = plotW / n;
+    let svg = "";
+    for (let v = lo; v <= hi + step / 2; v += step) {
+      svg += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#2d4136"/>`;
+      svg += `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#93a89a">${fmt(Math.round(v))}</text>`;
+    }
+    const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(plotW / (withYear ? 76 : 64)))));
+    for (let i = 0; i < n; i += every)
+      svg += `<text x="${L + w * i + w / 2}" y="${H - 6}" text-anchor="middle" font-size="11" fill="#93a89a">${axisLabel(pts[i].day)}</text>`;
+    if (s.low && s.high) {
+      // el rango normal sale de los últimos 30 días, así que solo se sombrea ese tramo
+      const bandFrom = new Date(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate() - 29);
+      let bi = pts.findIndex((p, i) => (pts[i + 1] ? pts[i + 1].day : new Date(8.64e15)) > bandFrom);
+      if (bi < 0) bi = 0;
+      const bx = L + w * bi;
+      svg += `<rect x="${bx}" y="${y(s.high)}" width="${L + plotW - bx}" height="${Math.max(1, y(s.low) - y(s.high))}" fill="rgba(154,252,88,.14)" opacity="1"/>`;
+    }
+    const maxSold = Math.max(1, ...pts.map((p) => p.sold)), bw = Math.max(1, w * 0.62);
+    pts.forEach((p, i) => {
+      if (!p.sold) return;
+      const h = VOL * p.sold / maxSold;
+      svg += `<rect class="bar" data-i="${i}" x="${L + w * i + (w - bw) / 2}" y="${volTop + VOL - h}" width="${bw}" height="${h}" fill="#3f5448"/>`;
+    });
+    if (s.target && s.target >= lo && s.target <= hi) {
+      svg += `<line x1="${L}" x2="${W - R}" y1="${y(s.target)}" y2="${y(s.target)}" stroke="#6ef19c" stroke-width="1.4" stroke-dasharray="5 4"/>`;
+      svg += `<text x="${W - R}" y="${y(s.target) - 5}" text-anchor="end" font-size="11" font-weight="600" fill="#6ef19c" stroke="#0a120d" stroke-width="3" paint-order="stroke">Tu aviso: ${fmt(s.target)}</text>`;
+    }
+    let line = "", area = "", open = false, segStart = 0;
+    pts.forEach((p, i) => {
+      const x0 = L + w * i, x1 = x0 + w;
+      if (p.avg) {
+        const yy = y(p.avg).toFixed(1);
+        if (!open) { line += `M${x0},${yy}`; area += `M${x0},${T + plotH}L${x0},${yy}`; segStart = x0; open = true; }
+        else { line += `L${x0},${yy}`; area += `L${x0},${yy}`; }
+        line += `L${x1},${yy}`; area += `L${x1},${yy}`;
+      } else if (open) { area += `L${x0},${T + plotH}L${segStart},${T + plotH}Z`; open = false; }
+    });
+    if (open) area += `L${L + plotW},${T + plotH}L${segStart},${T + plotH}Z`;
+    svg += `<path d="${area}" fill="rgba(154,252,88,.15)" fill-opacity="1"/><path d="${line}" fill="none" stroke="#9afc58" stroke-width="2.2"/>`;
+    pts.forEach((p, i) => { if (p.low) svg += `<rect x="${L + w * i + w / 2 - 3}" y="${y(p.low) - 3}" width="6" height="6" fill="#4ee588"/>`; });
+    svg += `<g id="cursor" visibility="hidden"><line id="cur-line" y1="${T}" y2="${volTop + VOL}" stroke="#9afc58" stroke-dasharray="2 3"/><rect id="cur-dot" width="10" height="10" fill="#9afc58" stroke="#0a120d" stroke-width="2"/></g>`;
+    host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Historial de precio de ${esc(s.name)}">${svg}</svg><div class="tip" hidden></div>`;
+
+    const svgEl = host.querySelector("svg"), tip = host.querySelector(".tip"), cursor = host.querySelector("#cursor");
+    const hide = () => { tip.hidden = true; cursor.setAttribute("visibility", "hidden");
+      host.querySelectorAll(".bar").forEach((b) => b.setAttribute("fill", "#3f5448")); };
+    const show = (clientX) => {
+      const r = svgEl.getBoundingClientRect(), x = (clientX - r.left) * (W / r.width), i = Math.floor((x - L) / w);
+      if (i < 0 || i >= n) { hide(); return; }
+      const p = pts[i], cx = L + w * i + w / 2;
+      cursor.setAttribute("visibility", "visible");
+      host.querySelector("#cur-line").setAttribute("x1", cx); host.querySelector("#cur-line").setAttribute("x2", cx);
+      const dot = host.querySelector("#cur-dot");
+      if (p.avg) { dot.setAttribute("x", cx - 5); dot.setAttribute("y", y(p.avg) - 5); dot.setAttribute("visibility", "visible"); }
+      else dot.setAttribute("visibility", "hidden");
+      host.querySelectorAll(".bar").forEach((b) => b.setAttribute("fill", +b.dataset.i === i ? "#4ee588" : "#3f5448"));
+      const when = weekly ? `Semana del ${fmtDay(p.day)} ${p.day.getFullYear()}`
+                          : fmtDay(p.day, true) + (withYear ? ` ${p.day.getFullYear()}` : "");
+      tip.innerHTML = `<div class="d">${when}</div><div>Promedio <b>${p.avg ? fmt(p.avg) : "sin ventas"}</b></div>` +
+        (p.low ? `<div>Oferta más baja <b>${fmt(p.low)}</b></div>` : "") +
+        `<div>Vendidos${weekly ? " en la semana" : ""} <b>${fmt(p.sold)}</b></div><div>${weekly ? "Ofertas al cierre de la semana" : "Ofertas abiertas ese día"} <b>${fmt(p.offers)}</b></div>`;
+      tip.hidden = false;
+      const px = cx * (r.width / W), tw = tip.offsetWidth;
+      tip.style.left = (px + 14 + tw < r.width ? px + 14 : Math.max(0, px - 14 - tw)) + "px";
+    };
+    svgEl.addEventListener("pointermove", (ev) => show(ev.clientX));
+    svgEl.addEventListener("pointerdown", (ev) => show(ev.clientX));
+    svgEl.addEventListener("pointerleave", (ev) => { if (ev.pointerType === "mouse") hide(); });
+  }
+
+  // ---- avisos ----
+  // el bot reconoce cada furni por los primeros 10 caracteres del SHA-1 de su clave
+  async function furniHash(key) {
+    const buf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(key));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 10);
+  }
+  async function openAlert(key, price) {
+    if (!index.bot) { toast("Las alertas todavía no están activas en este sitio."); return; }
+    const payload = `a_${await furniHash(key)}_${price}`;
+    window.open(`https://t.me/${encodeURIComponent(index.bot)}?start=${payload}`, "_blank", "noopener");
+  }
+  $("aviso-copy").addEventListener("click", () => {
+    const price = parseInt($("aviso-price").value, 10);
+    if (!current) return;
+    if (!price || price < 1) { $("aviso-price").focus(); toast("Escribe primero el precio en créditos."); return; }
+    openAlert(current.key, price);
+  });
+  $("list").addEventListener("click", (ev) => {
+    const b = ev.target.closest(".copy"); if (!b) return;
+    ev.stopPropagation();
+    const price = parseInt(prompt(`¿A qué precio quieres que te avisemos de ${b.dataset.name}?`, "") || "", 10);
+    if (price > 0) openAlert(b.dataset.key, price);
+  });
+  $("deals-link").addEventListener("click", () => {
+    if (!index.bot) { toast("Las alertas todavía no están activas en este sitio."); return; }
+    window.open(`https://t.me/${encodeURIComponent(index.bot)}?start=gangas`, "_blank", "noopener");
+  });
+
+
+
+  // ---- pestaña En vivo ----
+  const LIVE_FRESH = 15 * 60;          // solo precios confirmados en los últimos 15 minutos
+  const seenDeals = new Map();          // furni -> cuándo apareció como oportunidad (segundos)
+  let dealsReady = false, unseen = 0;
+  try { Object.entries(JSON.parse(store.get("mercadillo-deals-seen") || "{}")).forEach(([k, v]) => seenDeals.set(k, v)); } catch {}
+
+  function liveDeals() {
+    if (!live) return [];
+    const now = Date.now() / 1000;
+    return all.filter((s) => s.liveAt && now - s.liveAt <= LIVE_FRESH && s.hasFair && s.fair >= 10 && s.price &&
+      s.sold >= MIN_VOLUME && (s.low ? s.price < s.low : s.delta <= -0.10) && Math.abs(s.price - s.fair) >= 3 &&
+      (s.dr == null || s.dr <= 30));
+  }
+  function trackDeals() {
+    const deals = liveDeals(), now = Math.round(Date.now() / 1000), current_ = new Set(deals.map((d) => d.key));
+    const fresh = deals.filter((d) => !seenDeals.has(d.key));
+    // al abrir la página, lo que ya estaba no se marca como "Nueva": solo lo que aparezca después
+    fresh.forEach((d) => seenDeals.set(d.key, dealsReady ? now : now - 3600));
+    [...seenDeals.keys()].forEach((k) => { if (!current_.has(k)) seenDeals.delete(k); });
+    store.set("mercadillo-deals-seen", JSON.stringify(Object.fromEntries(seenDeals)));
+    if (dealsReady && fresh.length) {        // en la primera carga no se avisa de todo lo que ya había
+      if (document.hidden) { unseen += fresh.length; document.title = `(${unseen}) Mercadillo`; }
+      if (store.get("mercadillo-notify") === "1") notifyDeals(fresh);
+    }
+    dealsReady = true;
+  }
+  function notifyDeals(list) {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    const top = [...list].sort((a, b) => a.delta - b.delta)[0];
+    try {
+      new Notification(list.length === 1 ? "Nueva oportunidad en el Mercadillo" : `${list.length} oportunidades nuevas`,
+        { body: `${top.name} a ${fmt(top.price)} créditos (${Math.round(top.delta * 100)}% vs precio justo)`, tag: "mercadillo" });
+    } catch { /* algunos celulares no permiten avisos desde una página: queda el contador en el título */ }
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { unseen = 0; document.title = "Mercadillo"; } });
+
+  function renderLiveTab() {
+    const box = $("live-summary"), list = $("live-list");
+    if (!index.live) { box.innerHTML = `<div class="panel empty">Los precios en vivo no están activos en este sitio.</div>`; list.hidden = true; return; }
+    if (!live) { box.innerHTML = `<div class="panel empty">Conectando con los precios en vivo…</div>`; list.hidden = true; return; }
+    const now = Date.now() / 1000;
+    const checked = Object.values(live.items).filter((v) => v[2] + (now - live.t) <= LIVE_FRESH).length;
+    const deals = liveDeals().sort((a, b) => (seenDeals.get(b.key) || 0) - (seenDeals.get(a.key) || 0) || a.delta - b.delta);
+    const canNotify = "Notification" in window;
+    const on = store.get("mercadillo-notify") === "1" && canNotify && Notification.permission === "granted";
+    box.innerHTML = `<div class="panel live-top"><div>
+        <strong>${deals.length ? `${fmt(deals.length)} oportunidad${deals.length === 1 ? "" : "es"} ahora` : "Sin oportunidades en este momento"}</strong>
+        <span>${fmt(checked)} furnis confirmados en los últimos 15 min, actualizado hace ${agoShort(liveAge())}. Se refresca sola cada minuto.</span></div>
+        ${canNotify ? `<button class="btn ${on ? "ghost" : ""}" id="notify-btn">${on ? "Avisos activados" : "Avisarme"}</button>` : ""}</div>`;
+    const btn = $("notify-btn");
+    if (btn) btn.addEventListener("click", async () => {
+      if (on) { store.set("mercadillo-notify", "0"); renderLiveTab(); return; }
+      const perm = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+      if (perm === "granted") { store.set("mercadillo-notify", "1"); toast("Te avisaremos mientras esta página esté abierta."); }
+      else toast("El navegador no dio permiso para avisos. Puedes activarlo en su configuración.");
+      renderLiveTab();
+    });
+    const fee = Number(index.fee_pct ?? 1);
+    list.hidden = !deals.length;
+    list.innerHTML = deals.map((s) => {
+      const net = Math.round(s.fair * (1 - fee / 100) - s.price);
+      const isNew = now - (seenDeals.get(s.key) || 0) < 10 * 60;
+      const sub = `<div class="sub">${isNew ? '<span class="badge-new">Nueva</span>' : ""}Confirmado hace ${agoShort(now - s.liveAt)}. Precio justo ${fmt(s.fair)}, revenderlo deja <b>+${fmt(net)}</b></div>`;
+      return rowHtml(s, sub);
+    }).join("");
+    bindRows(list);
+  }
+
+  // ---- radar ----
+  let prediction = null, predictionLoading = null;
+  function loadPrediction() {
+    if (!predictionLoading) {
+      predictionLoading = fetch(`${BASE}prediccion.json?v=${encodeURIComponent(index.updated || "")}`)
+        .then((r) => r.ok ? r.json() : null).catch(() => null).then((d) => { prediction = d; return d; });
+    }
+    return predictionLoading;
+  }
+  const pct1 = (x) => `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x * 100).toFixed(1)}%`;
+  function radarPick(key) { return prediction && prediction.enabled ? (prediction.picks || []).find((p) => p.k === key) : null; }
+
+  async function renderRadar() {
+    const box = $("radar-summary"), list = $("radar-list");
+    box.innerHTML = `<div class="panel empty">Cargando el radar…</div>`;
+    const p = await loadPrediction();
+    if (!p) { box.innerHTML = `<div class="panel empty"><strong>El radar todavía no se ha calculado</strong>Aparecerá después de la siguiente actualización.</div>`; list.hidden = true; return; }
+    if (p.reason && !p.picks_ret && p.picks_ret !== 0) {
+      renderSeasons(p);
+      box.innerHTML = `<div class="panel empty"><strong>Todavía no hay datos suficientes</strong>${esc(p.reason)}</div>`; list.hidden = true; return;
+    }
+    const period = `${fmtDay(parseDay(p.test_from))} ${parseDay(p.test_from).getFullYear()} a ${fmtDay(parseDay(p.test_to))} ${parseDay(p.test_to).getFullYear()}`;
+    const stats = `<div class="panel summary" style="margin-top:12px">
+        <div><b class="${p.enabled && p.picks_ret > p.market_ret ? "down" : ""}">${pct1(p.picks_ret)}</b><span>Radar, en ${p.horizon_days} días</span></div>
+        <div><b>${pct1(p.market_ret)}</b><span>Mercado en general</span></div>
+        <div><b>${Math.round(p.beat_share * 100)}%</b><span>Semanas que le ganó</span></div></div>`;
+    renderSeasons(p);
+    if (!p.enabled) {
+      const excess = p.picks_ret - p.market_ret;
+      const checks = [
+        [excess > 0.01, `Diferencia típica contra el mercado: ${pct1(excess)}`, "más de +1%"],
+        [p.beat_share >= 0.6, `Semanas que le ganó: ${Math.round(p.beat_share * 100)}%`, "al menos 60%"],
+        [p.hit_rate > 0.5, `Compras que terminaron con ganancia: ${Math.round(p.hit_rate * 100)}%`, "más de 50%"],
+        [(p.t_stat || 0) >= 2, `Confianza de que no es suerte: ${(p.t_stat || 0).toFixed(1)}`, "al menos 2.0"],
+      ];
+      box.innerHTML = `<div class="panel radar-sum"><h4>Por ahora no hay recomendaciones</h4>
+        <p>Probamos las señales con ${p.test_weeks} semanas de historial (${period}), sin mirar el futuro. Para recomendar, la prueba tiene que cumplir las cuatro condiciones; se vuelve a probar en cada actualización.</p>
+        <ul class="checks">${checks.map(([ok, label, need]) => `<li class="${ok ? "ok" : "no"}"><span>${ok ? "✓" : "✗"}</span>${label} <em>(necesita ${need})</em></li>`).join("")}</ul></div>${stats}`;
+      list.hidden = true;
+      return;
+    }
+    box.innerHTML = `<div class="panel radar-sum"><h4>Qué dice la prueba contra el pasado</h4>
+      <p>Durante ${p.test_weeks} semanas (${period}), comprar cada semana los ${p.top_n} furnis con mejor puntaje y venderlos ${p.horizon_days} días después dio un resultado típico de <b>${pct1(p.picks_ret)}</b> ya con comisión, contra ${pct1(p.market_ret)} del mercado. Le ganó al mercado ${Math.round(p.beat_share * 100)}% de las semanas y ${Math.round(p.hit_rate * 100)}% de las compras terminaron con ganancia.</p></div>${stats}`;
+    const byKey = new Map(all.map((s) => [s.key, s]));
+    const rows = (p.picks || []).map((pk) => ({ pk, s: byKey.get(pk.k) })).filter((x) => x.s);
+    list.hidden = !rows.length;
+    list.innerHTML = rows.map(({ pk, s }) => rowHtml(s, `<div class="sub">${esc(pk.why[0])}</div>`,
+      `<div class="delta ${pk.expected > 0 ? "down" : "flat"}" title="Resultado típico de puntajes así en la prueba">${pct1(pk.expected)} típico</div>`)).join("");
+    bindRows(list);
+  }
+
+
+  // ---- calendario de temporadas ----
+  function renderSeasons(p) {
+    const title = $("season-title"), box = $("season-box");
+    const rows = (p && p.seasons || []).filter((c) => c.items > 0 && c.months.some((v) => v != null));
+    title.hidden = box.hidden = !rows.length;
+    if (!rows.length) return;
+    const now = new Date(), month = now.getMonth(); // 0 = enero
+    const cls = (v) => v == null ? "" : v >= 0.02 ? "up2" : v >= 0.005 ? "up1" : v <= -0.02 ? "dn2" : v <= -0.005 ? "dn1" : "";
+    const label = (v) => { if (v == null) return "–"; const r = Math.round(v * 100); return r === 0 ? "0" : `${r > 0 ? "+" : "−"}${Math.abs(r)}`; };
+    const head = `<div></div>${MONTHS.map((m, i) => `<div class="m"${i === month ? ' style="color:var(--ink);font-weight:700"' : ""}>${m[0].toUpperCase()}</div>`).join("")}`;
+    const body = rows.map((c) => `<div class="name" title="${esc(c.name)}">${esc(c.name)}</div>` +
+      c.months.map((v, i) => `<div class="c ${cls(v)}${i === month ? " now" : ""}" title="${MONTHS[i]}: ${v == null ? "sin datos" : pct1(v) + " contra el mercado"}">${label(v)}</div>`).join("")).join("");
+    // ¿qué temporada viene? el mes actual o el siguiente con más de +2%
+    const soon = [];
+    rows.forEach((c) => [month, (month + 1) % 12].forEach((m) => {
+      const v = c.months[m];
+      if (v != null && v >= 0.02 && !soon.some((x) => x.c === c)) soon.push({ c, m, v });
+    }));
+    const next = soon.sort((a, b) => b.v - a.v)[0];
+    box.innerHTML = `<p>Cuánto les ganaron (o perdieron) al mercado los furnis de cada tema, en 14 días, según el mes. Los números son porcentajes; el mes actual está remarcado.</p>
+      <div class="season-grid">${head}${body}</div>
+      <div class="season-legend"><span><i style="background:#3ba66e"></i>+2% o más</span><span><i style="background:#2e6a4c"></i>un poco arriba</span><span><i style="background:#6f4848"></i>un poco abajo</span><span><i style="background:#a34848"></i>−2% o menos</span></div>
+      ${next ? `<div class="season-next">Se acerca la temporada de <b>${esc(next.c.name)}</b>: en ${MONTHS[next.m]} sus furnis le ganaron al mercado por ${pct1(next.v)}.</div>` : ""}
+      <p style="margin:12px 4px 0;font-size:13px">Con dos años de historial, cada mes se ha visto una o dos veces: tómalo como una pista, no como una regla. Se recalcula en cada actualización.</p>`;
+  }
+
+  async function paintRadarBox(key) {
+    // async paintRadarBox is kept as-is; see below for the same logic wrapped in a helper
+    const box = $("radar-box");
+    box.hidden = true;
+    await loadPrediction();
+    const pk = radarPick(key);
+    if (!pk || !current || current.key !== key) return;
+    box.querySelector("strong").textContent = `En el radar: en la prueba, puntajes así cambiaron un típico de ${pct1(pk.expected)} en ${prediction.horizon_days} días`;
+    box.querySelector("ul").innerHTML = pk.why.map((w) => `<li>${esc(w)}</li>`).join("");
+    box.hidden = false;
+  }
+
+  // ---- lanzamientos ----
+  function renderLaunches() {
+    const rows = all.filter((s) => s.launched).sort((a, b) => b.launched.localeCompare(a.launched) || b.sold - a.sold);
+    if (!rows.length) {
+      $("launches").innerHTML = `<div class="empty"><strong>Todavía no hay lanzamientos</strong>El radar compara el catálogo de cada día con el anterior, así que detecta furnis nuevos a partir de mañana.</div>`;
+      return;
+    }
+    $("launches").innerHTML = rows.map((s) => {
+      const age = daysAgo(s.launched);
+      const when = age <= 0 ? "Salió hoy" : age === 1 ? "Salió ayer" : `Salió hace ${age} días`;
+      const sub = `<div class="sub">${when}, ${s.sold ? `${fmt(s.sold)} vendidos` : "aún sin ventas"}</div>`;
+      const peak = s.spark.length ? Math.max(...s.spark) : null;
+      let right = `<div class="delta flat">${s.price ? "" : "sin ofertas"}</div>`;
+      if (peak && s.price) {
+        const d = (s.price - peak) / peak;
+        right = d < -0.02 ? `<div class="delta down" title="Comparado con el día más caro desde que salió">−${Math.abs(Math.round(d * 100))}% vs máximo</div>`
+                          : `<div class="delta up">en su máximo</div>`;
+      }
+      return rowHtml(s, sub, right);
+    }).join("");
+    bindRows($("launches"));
+  }
+
+  // ---- presupuesto ----
+  function renderBudget() {
+    const budget = parseInt($("budget").value, 10), out = $("budget-out");
+    if (!budget || budget < 1) { out.innerHTML = ""; return; }
+    store.set("mercadillo-budget", String(budget));
+    const fee = Number(index.fee_pct ?? 1);
+    const cands = all.map((s) => {
+      const net = s.price && s.fair ? Math.round(s.fair * (1 - fee / 100) - s.price) : 0;
+      return { ...s, net, roi: s.price ? net / s.price : 0 };
+    }).filter((s) => !(s.launched && daysAgo(s.launched) < 14)) // recién lanzados: su precio todavía se está acomodando
+      .filter((s) => s.hasFair && s.price && s.price <= budget && s.perDay >= 1 && s.dr != null && s.dr <= budgetDays && s.net >= 2 && s.roi >= 0.03)
+      .sort((a, b) => b.roi - a.roi || b.perDay - a.perDay);
+    const picks = []; let left = budget;
+    for (const c of cands) {
+      if (picks.length >= 10) break;
+      if (c.price <= left) { picks.push(c); left -= c.price; }
+    }
+    if (!picks.length) {
+      out.innerHTML = `<div class="panel empty" style="margin-top:12px"><strong>Nada convence por ahora</strong>Ningún furni que quepa en tu presupuesto está por debajo de su precio justo y se revende en ${budgetDays} días o menos. Prueba con más tiempo de reventa o revisa mañana.</div>`;
+      return;
+    }
+    const spent = budget - left, profit = picks.reduce((a, p) => a + p.net, 0);
+    out.innerHTML = `<div class="panel summary">
+        <div><b>${fmt(spent)}</b><span>Inviertes</span></div>
+        <div><b class="down">+${fmt(profit)}</b><span>Ganancia estimada</span></div>
+        <div><b>${fmt(left)}</b><span>Te sobran</span></div></div>
+      <div class="panel list picks" style="margin-top:12px">${picks.map((p) => rowHtml(p,
+        `<div class="sub">Vende a ${fmt(p.fair)}: <b>+${fmt(p.net)}</b> (${Math.round(p.roi * 100)}%), ~${fmt(Math.max(1, Math.round(p.dr)))} días</div>`,
+        `<div class="delta down">${Math.round(p.delta * 100)}%</div>`)).join("")}</div>
+      <p class="fine">Es una estimación con los precios de la última actualización: la oferta más baja puede ya no estar, y vender a su precio justo puede tomar los días indicados. La ganancia ya descuenta ${fee}% de comisión.</p>`;
+    bindRows(out);
+  }
+  $("budget-go").addEventListener("click", renderBudget);
+  $("budget").addEventListener("keydown", (ev) => { if (ev.key === "Enter") renderBudget(); });
+  $("budget-days").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    budgetDays = Number(b.dataset.days);
+    $("budget-days").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", x === b));
+    renderBudget();
+  });
+  $("budget").value = store.get("mercadillo-budget") || "";
+
+  // ---- pestañas ----
+  function showView(name) {
+    view = name;
+    document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.view === name));
+    $("list-view").hidden = name !== "market"; $("launches-view").hidden = name !== "launches"; $("budget-view").hidden = name !== "budget";
+    $("radar-view").hidden = name !== "radar";
+    $("live-view").hidden = name !== "live";
+    if (name === "radar") renderRadar();
+    if (name === "live") renderLiveTab();
+    if (name === "launches") renderLaunches();
+    if (name === "budget") renderBudget();
+  }
+  document.querySelector(".tabs").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (location.hash) location.hash = "";
+    showView(b.dataset.view);
+  });
+  $("hero-market").addEventListener("click", () => {
+    if (location.hash) location.hash = "";
+    showView("market");
+  });
+  $("hero-radar").addEventListener("click", () => {
+    if (location.hash) location.hash = "";
+    showView("radar");
+  });
+
+  // ---- controles ----
+  $("sort").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    sortMode = b.dataset.sort; shown = PAGE;
+    $("sort").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", x === b));
+    renderList();
+  });
+  let qTimer;
+  $("q").addEventListener("input", () => { clearTimeout(qTimer); qTimer = setTimeout(() => { shown = PAGE; renderList(); }, 150); });
+  $("range").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    rangeDays = Number(b.dataset.days);
+    $("range").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", x === b));
+    drawChart();
+  });
+  let rTimer;
+  window.addEventListener("resize", () => { clearTimeout(rTimer); rTimer = setTimeout(() => current && current.days && drawChart(), 150); });
+  $("back").addEventListener("click", () => { history.length > 1 ? history.back() : (location.hash = ""); });
+
+  function route() {
+    const key = decodeURIComponent(location.hash.slice(1));
+    const inDetail = !!(key && index && index.items[key]);
+    document.querySelector(".tabs").hidden = inDetail;
+    $("detail-view").hidden = !inDetail;
+    if (inDetail) { ["list-view", "live-view", "radar-view", "launches-view", "budget-view"].forEach((id) => { $(id).hidden = true; }); renderDetail(key); }
+    else { current = null; showView(view); }
+  }
+  window.addEventListener("hashchange", route);
+
+
+  // ---- precios en vivo (máquina de Azure) ----
+  let live = null;
+  const LIVE_EVERY = 120000; // cada 2 minutos, solo con la pestaña visible
+  const liveAge = () => live ? Math.max(0, Date.now() / 1000 - live.t) : null;
+  const agoShort = (sec) => sec < 60 ? `${Math.max(1, Math.round(sec))} s` : sec < 3600 ? `${Math.round(sec / 60)} min` : `${Math.round(sec / 3600)} h`;
+  function paintMeta() {
+    const a = liveAge();
+    if (live && a < 600) $("meta").innerHTML = `<span class="live-dot"></span>${esc(index.hotel)}, en vivo hace ${agoShort(a)}`;
+    else $("meta").textContent = `${index.hotel}, ${ago(index.updated)}`;
+  }
+  function applyLiveTo(s) {
+    const v = live && live.items && live.items[s.key];
+    if (!v) return false;
+    const [p, o, age] = v;
+    s.price = p || null;
+    if (o != null) s.offers = o;
+    s.delta = s.price && s.fair ? (s.price - s.fair) / s.fair : null;
+    if (o != null) s.dr = o > 0 && s.sold ? Math.round(o / (s.sold / 30) * 10) / 10 : null; // sin ofertas no hay con qué calcularlo
+    s.liveAt = live.t - age;
+    return true;
+  }
+  async function loadLive() {
+    if (!index || !index.live || document.hidden) return;
+    try {
+      const r = await fetch(index.live, { cache: "no-store" });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (live && data.t === live.t) { paintMeta(); return; }
+      live = data;
+      all.forEach(applyLiveTo);
+      paintMeta();
+      trackDeals();
+      if (current) { applyLiveTo(current); paintSummary(current); }
+      else if (view === "market") renderList();
+      else if (view === "live") renderLiveTab();
+      else if (view === "launches") renderLaunches();
+    } catch { /* si la máquina no responde, la página sigue con los datos publicados */ }
+  }
+
+  fetch(`${BASE}indice.json?t=${Date.now()}`)
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((json) => {
+      index = json;
+      all = Object.entries(index.items || {}).map(([k, e]) => enrich(k, e));
+      $("meta").textContent = `${index.hotel}, ${ago(index.updated)}`;
+      $("hero-count").textContent = fmt(all.length);
+      $("market-title").textContent = `Todo el Mercadillo, ${fmt(all.length)} furnis con ventas`;
+      // sin bot configurado, las alertas por Telegram no se muestran
+      if (!index.bot) {
+        document.querySelectorAll(".deals-cta, .panel.aviso").forEach((el) => { el.hidden = true; });
+        document.body.classList.add("no-alerts");
+      }
+      renderAlerts(); renderList(); route();
+      if (index.live) {
+        loadLive();
+        setInterval(loadLive, LIVE_EVERY);
+        setInterval(() => { if (view === "live" && !current) loadLive(); }, 60000); // en la pestaña En vivo, cada minuto
+        $("tab-live").hidden = false;
+        setInterval(paintMeta, 15000);
+        document.addEventListener("visibilitychange", () => { if (!document.hidden) loadLive(); });
+      }
+      if (all.some((s) => s.launched && daysAgo(s.launched) <= 3)) $("tab-launch-dot") && ($("tab-launch-dot").hidden = false);
+    })
+    .catch(() => {
+      $("meta").textContent = "sin datos";
+      $("list").innerHTML = `<div class="empty"><strong>Todavía no hay datos</strong>Corre el recolector una vez desde la pestaña Actions de tu repo.</div>`;
+    });
+})();
+
+</script>
+</body>
+</html>

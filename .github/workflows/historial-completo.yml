@@ -1,0 +1,53 @@
+name: Historial completo (una sola vez)
+
+# Corre el relleno de 2 años de historial durante casi 6 horas seguidas, el máximo que
+# permite GitHub por trabajo. Úsalo una o dos veces hasta que diga que ya no quedan pendientes;
+# después la corrida diaria se encarga de los furnis nuevos.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: recolectar          # nunca al mismo tiempo que el recolector diario
+  cancel-in-progress: false
+
+jobs:
+  historial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Traer los datos guardados
+        timeout-minutes: 3
+        env:
+          GIT_TERMINAL_PROMPT: "0"
+        run: |
+          mkdir -p sitio
+          timeout 60 git fetch --quiet --depth 1 origin datos
+          git archive FETCH_HEAD | tar -x -C sitio
+
+      - name: Traer historial de 2 años, publicando cada hora
+        timeout-minutes: 335
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # cinco tandas de una hora: después de cada una se publica, así la página
+          # se puede usar todo el tiempo y va mostrando el historial conforme llega
+          for tanda in 1 2 3 4 5; do
+            echo "::group::Tanda $tanda de 5"
+            set +e
+            python -u historial.py --sitio sitio --minutos 60 --avisar-fin
+            rc=$?
+            set -e
+            echo "::endgroup::"
+            bash publicar.sh "Historial, tanda $tanda ($(date -u '+%F %H:%M') UTC)"
+            if [ "$rc" -eq 3 ]; then echo "Ya no quedan pendientes."; break; fi
+          done
