@@ -821,8 +821,15 @@
     return `${Math.round(diff / 60)}m`;
   }
   function daysAgo(iso) { return Math.floor((Date.now() - new Date(iso)) / 86400000); }
+  const fileName = (c) => c.replace(/\*/g, "~").replace(/[^A-Za-z0-9_.\-~]/g, "-");
   function pct(v) { return (v > 0 ? "+" : "") + Math.round(v * 100) + "%"; }
   function pct1(v) { return (v > 0 ? "+" : "") + (v * 100).toFixed(1) + "%"; }
+
+  function getIcon(s) {
+    const hotel = index?.hotel || "habbo.es";
+    const domain = hotel.includes("habbo.") ? (hotel.startsWith("www.") ? hotel : "www." + hotel) : `www.habbo.${hotel}`;
+    return `https://${domain}/habbo-imaging/furni?typeid=${s.c}`;
+  }
 
   function enrich(k, e) {
     const s = { key: k, ...e };
@@ -849,7 +856,7 @@
     s.price = p || null;
     if (o != null) s.offers = o;
     s.delta = s.price && s.fair ? (s.price - s.fair) / s.fair : null;
-    if (o != null) s.dr = o > 0 && s.perDay ? Math.round(o / s.perDay * 10) / 10 : null;
+    if (o != null && s.perDay) s.dr = Math.round(o / s.perDay * 10) / 10;
     s.liveAt = (live.t - age) * 1000;
     return true;
   }
@@ -860,7 +867,7 @@
     return `<tr data-key="${s.key}">
       <td>
         <div class="furni-cell">
-          <div class="furni-icon"><img src="https://${index.hotel}/habbo-imaging/furni?typeid=${s.c}" loading="lazy"></div>
+          <div class="furni-icon"><img src="${getIcon(s)}" loading="lazy"></div>
           <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div>
         </div>
       </td>
@@ -931,7 +938,7 @@
     $("radar").innerHTML = picks.slice(0, 12).map((s) => {
       return `<div class="radar-card" style="cursor:pointer" onclick="location.hash='${s.key}'">
         <div class="furni-cell" style="margin-bottom:16px">
-          <div class="furni-icon"><img src="https://${index.hotel}/habbo-imaging/furni?typeid=${s.c}"></div>
+          <div class="furni-icon"><img src="${getIcon(s)}"></div>
           <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div>
         </div>
         <div class="label">Crecimiento Estimado</div>
@@ -955,11 +962,11 @@
       .sort((a, b) => a.age - b.age);
     
     $("live-rows").innerHTML = entries.slice(0, 50).map((e) => {
-      const s = all.find(x => x.key === e.key) || { name: "Furni Desconocido" };
+      const s = all.find(x => x.key === e.key) || { name: "Furni Desconocido", c: e.key.split(":")[1] };
       return `<tr onclick="location.hash='${e.key}'">
         <td><div class="furni-cell">
-          <div class="furni-icon"><img src="https://www.habbo.es/habbo-imaging/furni?typeid=${e.key.split("*")[0]}"></div>
-          <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(e.key)}</span></div>
+          <div class="furni-icon"><img src="${getIcon(s)}"></div>
+          <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c || e.key.split(":")[1])}</span></div>
         </div></td>
         <td><div class="price-val">${e.price || "—"}</div></td>
         <td>${e.offers != null ? e.offers : "—"}</td>
@@ -986,7 +993,7 @@
           state = d < -0.02 ? `<span class="delta-pill up">−${Math.abs(Math.round(d * 100))}% vs max</span>` : `<span class="delta-pill down">máximo</span>`;
         }
         return `<tr onclick="location.hash='${s.key}'">
-          <td><div class="furni-cell"><div class="furni-icon"><img src="https://www.habbo.es/habbo-imaging/furni?typeid=${s.c}"></div><div>${esc(s.name)}</div></div></td>
+          <td><div class="furni-cell"><div class="furni-icon"><img src="${getIcon(s)}"></div><div>${esc(s.name)}</div></div></td>
           <td>${when}</td>
           <td>${fmt(s.sold)}</td>
           <td>${state}</td>
@@ -995,40 +1002,140 @@
   }
 
   // ---- Detail & Chart ----
+  let currentHistory = null;
+
   function drawChart() {
     const canvas = $("chart"), ctx = canvas.getContext("2d");
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
+    const w = rect.width, h = rect.height;
 
-    const data = (current.spark || []).slice(-rangeDays);
-    if (data.length < 2) return;
+    if (!current) return;
+
+    let history = [];
+    if (currentHistory && currentHistory.d) {
+      history = Object.entries(currentHistory.d)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([date, vals]) => ({ date, avg: vals[0], sold: vals[1], offers: vals[2], low: vals[3] }));
+    } else {
+      history = (current.spark || []).map((v) => ({ avg: v }));
+    }
+
+    const data = history.slice(-rangeDays).filter(x => x.avg !== null);
+    if (data.length < 2) {
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.textAlign = "center";
+      ctx.fillText("Sin datos suficientes para este periodo", w/2, h/2);
+      return;
+    }
+
+    const prices = data.map(x => x.avg);
+    if (data.some(x => x.low)) data.forEach(d => { if(d.low) prices.push(d.low); });
     
-    const min = Math.min(...data) * 0.95, max = Math.max(...data) * 1.05;
-    const pad = 20, w = rect.width, h = rect.height - pad * 2;
+    const minP = Math.min(...prices) * 0.98, maxP = Math.max(...prices) * 1.02;
+    const margin = { top: 20, right: 20, bottom: 40, left: 45 };
+    const chartW = w - margin.left - margin.right;
+    const chartH = h - margin.top - margin.bottom;
+
+    const getX = (i) => margin.left + (i / (data.length - 1)) * chartW;
+    const getY = (p) => margin.top + chartH - ((p - minP) / (maxP - minP)) * chartH;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Grid & Y labels
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.lineWidth = 1;
+    ctx.font = "10px Inter, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.textAlign = "right";
     
-    ctx.clearRect(0, 0, w, rect.height);
+    [0, 0.25, 0.5, 0.75, 1].forEach(f => {
+      const p = minP + f * (maxP - minP);
+      const y = getY(p);
+      ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(w - margin.right, y); ctx.stroke();
+      ctx.fillText(fmt(Math.round(p)), margin.left - 8, y + 3);
+    });
+
+    // Legend
+    ctx.textAlign = "left";
+    ctx.fillText("● Precio Medio", margin.left, margin.top - 8);
+    if (data.some(x => x.low)) {
+      ctx.fillStyle = "#10b981"; ctx.fillText("● Gangas", margin.left + 85, margin.top - 8);
+    }
+    if (data.some(x => x.offers)) {
+      ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillText("■ Stock", margin.left + 150, margin.top - 8);
+    }
+
+    // X Labels
+    ctx.textAlign = "center";
+    const step = Math.max(1, Math.floor(data.length / 6));
+    data.forEach((d, i) => {
+      if (i % step === 0 || i === data.length - 1) {
+        const x = getX(i);
+        if (d.date) {
+           const label = d.date.split("-").slice(1).reverse().join("/");
+           ctx.fillText(label, x, h - 20);
+           if (i === data.length - 1 || i === 0) {
+              ctx.fillText(d.date.split("-")[0], x, h - 8);
+           }
+        }
+      }
+    });
+
+    // Stock bars (optional, light)
+    if (data.some(x => x.offers)) {
+      const maxO = Math.max(...data.map(x => x.offers || 0));
+      data.forEach((d, i) => {
+        if (d.offers) {
+          const bw = (chartW / data.length) * 0.5;
+          const bh = (d.offers / maxO) * chartH * 0.3;
+          ctx.fillStyle = "rgba(255,255,255,0.03)";
+          ctx.fillRect(getX(i) - bw/2, margin.top + chartH - bh, bw, bh);
+        }
+      });
+    }
+
+    // Price Area
     ctx.beginPath();
-    ctx.strokeStyle = "#7c3aed"; ctx.lineWidth = 3; ctx.lineJoin = "round";
-    
-    data.forEach((v, i) => {
-      const x = (i / (data.length - 1)) * w;
-      const y = rect.height - pad - ((v - min) / (max - min)) * h;
+    data.forEach((d, i) => {
+      const x = getX(i), y = getY(d.avg);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.lineTo(getX(data.length - 1), margin.top + chartH);
+    ctx.lineTo(getX(0), margin.top + chartH);
+    const grad = ctx.createLinearGradient(0, margin.top, 0, margin.top + chartH);
+    grad.addColorStop(0, "rgba(124, 58, 237, 0.15)"); grad.addColorStop(1, "transparent");
+    ctx.fillStyle = grad; ctx.fill();
+
+    // Price Line
+    ctx.beginPath();
+    ctx.strokeStyle = "#a78bfa"; ctx.lineWidth = 2.5; ctx.lineJoin = "round";
+    data.forEach((d, i) => {
+      const x = getX(i), y = getY(d.avg);
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
     ctx.stroke();
 
-    // Fill area
-    ctx.lineTo(w, rect.height); ctx.lineTo(0, rect.height);
-    const grad = ctx.createLinearGradient(0, 0, 0, rect.height);
-    grad.addColorStop(0, "rgba(124, 58, 237, 0.2)"); grad.addColorStop(1, "transparent");
-    ctx.fillStyle = grad; ctx.fill();
+    // Low price points
+    data.forEach((d, i) => {
+      if (d.low && d.low < d.avg) {
+        ctx.fillStyle = "#10b981";
+        ctx.beginPath(); ctx.arc(getX(i), getY(d.low), 2, 0, Math.PI*2); ctx.fill();
+      }
+    });
   }
 
   async function route() {
     const k = location.hash.slice(1);
-    if (!k) { $("overlay").classList.remove("active"); current = null; return; }
+    if (!k || k === "dashboard-root" || k === "hero") { 
+      $("overlay").classList.remove("active"); 
+      document.body.style.overflow = "";
+      current = null; 
+      currentHistory = null;
+      return; 
+    }
     const s = all.find((x) => x.key === k);
     if (!s) return;
     current = s;
@@ -1037,15 +1144,48 @@
     $("detail-price").textContent = s.price ? fmt(s.price) : "—";
     $("detail-fair").textContent = s.fair ? fmt(s.fair) : "—";
     
+    // Extra Decision Info
+    const extra = $("detail-extra");
+    let html = `<div class="stats-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 24px;">`;
+    if (s.price && s.fair) {
+      const fee = index.fee_pct || 1;
+      const net = Math.round(s.fair * (1 - fee/100) - s.price);
+      const roi = Math.round((net / s.price) * 100);
+      html += `<div class="stat-card"><span class="label">Beneficio Neto (con fee)</span><span class="value ${net > 0 ? 'up' : 'down'}">${net > 0 ? '+' : ''}${fmt(net)} (${roi}%)</span></div>`;
+    }
+    if (s.dr != null) {
+      html += `<div class="stat-card"><span class="label">Liquidez (Días Stock)</span><span class="value">${s.dr} días</span></div>`;
+    }
+    html += `</div>`;
+    
+    if (s.l && s.h) {
+      html += `<div style="background:rgba(255,255,255,0.03); padding:16px; border-radius:12px; margin-bottom:24px; font-size:13px; display:flex; justify-content:space-between;">
+        <span>Rango Normal: <b>${fmt(s.l)}</b> - <b>${fmt(s.h)}</b></span>
+        <span style="color:var(--muted)">Volumen: <b>${fmt(s.sold)}</b>/mes</span>
+      </div>`;
+    }
+    extra.innerHTML = html;
+
+    document.body.style.overflow = "hidden";
     $("overlay").classList.add("active");
-    setTimeout(drawChart, 50);
+    drawChart(); // Initial draw with sparkline
+    
+    // Fetch deep history
+    try {
+      const path = `h/${s.t}/${fileName(s.c)}.json`;
+      const r = await fetch(path);
+      if (r.ok) {
+        currentHistory = await r.json();
+        drawChart();
+      }
+    } catch(e) {}
     
     const radar = $("radar-box");
     radar.hidden = true;
     await loadPrediction();
     const pk = radarPick(s.key);
     if (pk) {
-      radar.querySelector("strong").textContent = `Proyección: ${pct1(pk.expected)} en ${prediction.horizon_days} días`;
+      radar.querySelector("strong").textContent = `Proyección AI: ${pct1(pk.expected)} en ${prediction.horizon_days} días`;
       radar.querySelector("ul").innerHTML = pk.why.map((w) => `<li>${esc(w)}</li>`).join("");
       radar.hidden = false;
     }
@@ -1086,8 +1226,16 @@
     drawChart();
   });
 
-  $("back").addEventListener("click", () => location.hash = "");
-  $("overlay").addEventListener("click", (e) => { if (e.target === $("overlay")) location.hash = ""; });
+  $("back").addEventListener("click", () => {
+    if (window.history.length > 1) history.back();
+    else location.hash = "dashboard-root";
+  });
+  $("overlay").addEventListener("click", (e) => { 
+    if (e.target === $("overlay")) {
+      if (window.history.length > 1) history.back();
+      else location.hash = "dashboard-root";
+    }
+  });
 
   // ---- Initial Fetch ----
   fetch(`indice.json?t=${Date.now()}`)
@@ -1188,7 +1336,7 @@
           <tbody>
             ${picks.map(p => `<tr data-key="${p.key}">
               <td><div class="furni-cell">
-                <div class="furni-icon"><img src="https://${index.hotel}/habbo-imaging/furni?typeid=${p.c}"></div>
+                <div class="furni-icon"><img src="${getIcon(p)}"></div>
                 <div>${esc(p.name)}</div>
               </div></td>
               <td><div class="price-val">${fmt(p.fair)}</div></td>
