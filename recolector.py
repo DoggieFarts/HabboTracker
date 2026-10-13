@@ -55,7 +55,7 @@ MAX_RETRIES = 6
 FRESH_HOURS = 10             # un furni actualizado hace menos de esto se salta (hay dos corridas al día)
 TIME_BUDGET_MIN = 75         # tope de seguridad: al pasarlo se guarda lo avanzado y la próxima corrida sigue
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-              "Chrome/140.0 Safari/537.36 Mercadillo/2.0")
+              "Chrome/130.0 Safari/537.36 Mercadillo/2.0")
 
 
 # ---------------------------------------------------------------------------
@@ -248,7 +248,7 @@ def summarize(days: dict[str, list]) -> dict:
 # corrida
 # ---------------------------------------------------------------------------
 
-def run(site: Path, hotel: str, full_scan: bool, config: dict, hotels: list[str]) -> int:
+def run(site: Path, hotel: str, full_scan: bool, config: dict, hotels: list[str], hotel_idx: int) -> int:
     if hotel not in HOTELS:
         print(f"Hotel desconocido en avisos.json: {hotel}. Opciones: {', '.join(HOTELS)}")
         return 1
@@ -337,7 +337,9 @@ def run(site: Path, hotel: str, full_scan: bool, config: dict, hotels: list[str]
         part = bool(stopped and full_mode and swp < len(all_keys))
         
         save_json(site / "indice.json", {
-            "hotel": hotel, "hoteles": hotels, "fee_pct": config.get("comision_pct", 1),
+            "hotel": hotel, 
+            "hotels": {h: {"name": h.upper(), "url": "/" if j == 0 else f"/{h}/"} for j, h in enumerate(hotels)},
+            "fee_pct": config.get("comision_pct", 1),
             "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "targets": targets, "catalog_size": len(catalog), "items": items,
             "bot": (config.get("telegram_bot") or "").lstrip("@") or None,
@@ -486,7 +488,7 @@ def main() -> int:
     exit_code = 0
     for i, hotel in enumerate(hotels):
         site = Path(args.sitio) if i == 0 else Path(args.sitio) / hotel
-        exit_code = max(exit_code, run(site, hotel, args.completo, config, hotels))
+        exit_code = max(exit_code, run(site, hotel, args.completo, config, hotels, i))
     return exit_code
 
 

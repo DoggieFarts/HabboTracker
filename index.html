@@ -807,14 +807,16 @@
 
   function ago(ts) {
     if (!ts) return "nunca";
-    const diff = (Date.now() - ts) / 1000;
+    const d = new Date(ts);
+    const diff = (Date.now() - d.getTime()) / 1000;
     if (diff < 60) return "ahora";
     if (diff < 3600) return `hace ${Math.round(diff / 60)}m`;
     if (diff < 86400) return `hace ${Math.round(diff / 3600)}h`;
     return `hace ${Math.round(diff / 86400)}d`;
   }
   function agoShort(ts) {
-    const diff = (Date.now() - ts) / 1000;
+    const d = new Date(ts);
+    const diff = (Date.now() - d.getTime()) / 1000;
     if (diff < 60) return `${Math.round(diff)}s`;
     return `${Math.round(diff / 60)}m`;
   }
@@ -824,13 +826,17 @@
 
   function enrich(k, e) {
     const s = { key: k, ...e };
-    s.sold = s.h ? s.h.reduce((a, b) => a + b, 0) : 0;
+    s.name = s.n;
+    s.price = s.p;
+    s.sold = s.s || 0;
+    s.offers = s.o;
+    s.fair = s.m;
+    s.spark = s.sp || [];
+    s.launched = s.f;
     s.perDay = s.sold / 30;
-    s.fair = s.p ? Math.round(s.p.reduce((a, b) => a + b, 0) / s.p.length) : null;
-    s.hasFair = s.fair && s.p && s.p.length >= 5;
+    s.hasFair = s.fair != null;
     if (index.live) applyLiveTo(s);
     else {
-      s.price = s.p ? s.p[s.p.length - 1] : null;
       s.delta = s.price && s.fair ? (s.price - s.fair) / s.fair : null;
     }
     return s;
@@ -843,19 +849,19 @@
     s.price = p || null;
     if (o != null) s.offers = o;
     s.delta = s.price && s.fair ? (s.price - s.fair) / s.fair : null;
-    if (o != null) s.dr = o > 0 && s.sold ? Math.round(o / (s.sold / 30) * 10) / 10 : null;
-    s.liveAt = live.t - age;
+    if (o != null) s.dr = o > 0 && s.perDay ? Math.round(o / s.perDay * 10) / 10 : null;
+    s.liveAt = (live.t - age) * 1000;
     return true;
   }
 
-  function rowHtml(s, sub, right) {
+  function rowHtml(s) {
     const deltaClass = !s.delta ? "flat" : s.delta < -0.05 ? "down" : s.delta > 0.05 ? "up" : "flat";
     const deltaText = s.delta ? pct(s.delta) : "est.";
     return `<tr data-key="${s.key}">
       <td>
         <div class="furni-cell">
-          <div class="furni-icon"><img src="https://www.habbo.es/habbo-imaging/furni?typeid=${s.key.split("*")[0]}" loading="lazy"></div>
-          <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.key)}</span></div>
+          <div class="furni-icon"><img src="https://${index.hotel}/habbo-imaging/furni?typeid=${s.c}" loading="lazy"></div>
+          <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div>
         </div>
       </td>
       <td><div class="price-val">${s.price ? fmt(s.price) : "—"}</div></td>
@@ -904,35 +910,36 @@
   }
 
   function radarPick(key) {
-    const p = prediction?.items[key];
+    const p = (prediction.picks || []).find(x => x.k === key);
     if (!p) return null;
-    const why = [];
-    if (p.score_history > 0.7) why.push("Tendencia histórica muy sólida");
-    if (p.score_recent > 0.8) why.push("Actividad reciente inusual");
-    if (p.score_scarcity > 0.6) why.push("Escasez detectada en ofertas");
-    return { expected: p.expected_change, why };
+    return { expected: p.expected, why: p.why };
   }
 
   async function renderRadar() {
     await loadPrediction();
-    const picks = all.filter((s) => prediction.items[s.key] && prediction.items[s.key].expected_change > 0.05)
-                     .sort((a, b) => prediction.items[b.key].expected_change - prediction.items[a.key].expected_change);
+    const picks = (prediction.picks || []).map(p => {
+      const s = all.find(x => x.key === p.k);
+      return s ? { ...s, ...p } : null;
+    }).filter(x => x && x.expected > 0.02)
+      .sort((a, b) => b.expected - a.expected);
     
     if (!picks.length) {
-      $("radar").innerHTML = `<div class="empty"><strong>Buscando señales...</strong>El radar necesita más datos de las últimas 24h para generar nuevas predicciones.</div>`;
+      $("radar").innerHTML = `<div class="empty"><strong>Buscando señales...</strong>El radar necesita más datos históricos para generar nuevas predicciones confiables.</div>`;
       return;
     }
 
     $("radar").innerHTML = picks.slice(0, 12).map((s) => {
-      const p = prediction.items[s.key];
       return `<div class="radar-card" style="cursor:pointer" onclick="location.hash='${s.key}'">
         <div class="furni-cell" style="margin-bottom:16px">
-          <div class="furni-icon"><img src="https://www.habbo.es/habbo-imaging/furni?typeid=${s.key.split("*")[0]}"></div>
-          <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.key)}</span></div>
+          <div class="furni-icon"><img src="https://${index.hotel}/habbo-imaging/furni?typeid=${s.c}"></div>
+          <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div>
         </div>
         <div class="label">Crecimiento Estimado</div>
-        <div class="value" style="color:var(--green)">${pct1(p.expected_change)}</div>
+        <div class="value" style="color:var(--green)">${pct1(s.expected)}</div>
         <div class="trend">en ${prediction.horizon_days} días</div>
+        <div class="radar-tags" style="margin-top:12px">
+          ${(s.why || []).map(w => `<span class="tag">${esc(w)}</span>`).join("")}
+        </div>
       </div>`;
     }).join("");
   }
@@ -979,7 +986,7 @@
           state = d < -0.02 ? `<span class="delta-pill up">−${Math.abs(Math.round(d * 100))}% vs max</span>` : `<span class="delta-pill down">máximo</span>`;
         }
         return `<tr onclick="location.hash='${s.key}'">
-          <td><div class="furni-cell"><div class="furni-icon"><img src="https://www.habbo.es/habbo-imaging/furni?typeid=${s.key.split("*")[0]}"></div><div>${esc(s.name)}</div></div></td>
+          <td><div class="furni-cell"><div class="furni-icon"><img src="https://www.habbo.es/habbo-imaging/furni?typeid=${s.c}"></div><div>${esc(s.name)}</div></div></td>
           <td>${when}</td>
           <td>${fmt(s.sold)}</td>
           <td>${state}</td>
@@ -995,7 +1002,7 @@
     canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
 
-    const data = (current.p || []).slice(-rangeDays);
+    const data = (current.spark || []).slice(-rangeDays);
     if (data.length < 2) return;
     
     const min = Math.min(...data) * 0.95, max = Math.max(...data) * 1.05;
@@ -1148,7 +1155,7 @@
     const cands = all.map((s) => {
       const net = s.price && s.fair ? Math.round(s.fair * (1 - fee / 100) - s.price) : 0;
       return { ...s, net, roi: s.price ? net / s.price : 0 };
-    }).filter((s) => !(s.launched && daysAgo(s.launched) < 14))
+    }).filter((s) => !(s.f && daysAgo(s.f) < 14))
       .filter((s) => s.hasFair && s.price && s.price <= budget && s.perDay >= 1 && s.dr != null && s.dr <= budgetDays && s.net >= 2 && s.roi >= 0.03)
       .sort((a, b) => b.roi - a.roi || b.perDay - a.perDay);
     
@@ -1181,7 +1188,7 @@
           <tbody>
             ${picks.map(p => `<tr data-key="${p.key}">
               <td><div class="furni-cell">
-                <div class="furni-icon"><img src="https://www.habbo.es/habbo-imaging/furni?typeid=${p.key.split("*")[0]}"></div>
+                <div class="furni-icon"><img src="https://${index.hotel}/habbo-imaging/furni?typeid=${p.c}"></div>
                 <div>${esc(p.name)}</div>
               </div></td>
               <td><div class="price-val">${fmt(p.fair)}</div></td>

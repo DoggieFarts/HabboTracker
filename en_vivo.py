@@ -44,7 +44,7 @@ INDEX_EVERY = 30 * 60      # recargar la lista de furnis cada media hora
 WRITE_EVERY = 20           # escribir vivo.json cada 20 segundos
 KEEP_SECONDS = 3 * 3600    # en vivo.json solo van precios de las últimas 3 horas
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-              "Chrome/140.0 Safari/537.36 Mercadillo-en-vivo/1.0")
+              "Chrome/130.0 Safari/537.36 Mercadillo-en-vivo/1.0")
 
 running = True
 
