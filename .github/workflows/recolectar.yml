@@ -23,7 +23,7 @@ concurrency:
 jobs:
   recolectar:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
 
@@ -81,6 +81,7 @@ jobs:
           done
 
       - name: Publicar la página
+        if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash publicar.sh "Datos del $(date -u '+%F %H:%M') UTC"

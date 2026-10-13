@@ -316,6 +316,40 @@ def run(site: Path, hotel: str, full_scan: bool, config: dict, hotels: list[str]
     base = HOTELS[hotel]
     done, found_total, stopped = 0, 0, False
     pause, calm, rate_limited = float(state.get("pause", PAUSE)), 0, 0
+
+    def checkpoint(scanned_pos: int):
+        for key in list(targets) + list(launches):  # avisos y lanzamientos sin ventas también aparecen
+            if key in launches and key in items:
+                items[key]["f"] = launches[key]
+            items.setdefault(key, {"n": names.get(key, key.split(":", 1)[1]), "c": key.split(":", 1)[1],
+                                   "t": key.split(":", 1)[0], "p": None, "a": None, "s": 0, "o": None, "sp": [],
+                                   **({"f": launches[key]} if key in launches else {})})
+
+        processed = max(0, done - len(priority))
+        # posiciones del catálogo ya cubiertas
+        curr_scanned = scan_items[processed - 1][0] + 1 if processed else 0
+        if stopped and all_keys:
+            res = (cursor + curr_scanned) % len(all_keys)
+        else:
+            res = next_cursor
+        
+        swp = (int(state.get("swept", 0)) if state.get("partial") else 0) + curr_scanned
+        part = bool(stopped and full_mode and swp < len(all_keys))
+        
+        save_json(site / "indice.json", {
+            "hotel": hotel, "hoteles": hotels, "fee_pct": config.get("comision_pct", 1),
+            "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "targets": targets, "catalog_size": len(catalog), "items": items,
+            "bot": (config.get("telegram_bot") or "").lstrip("@") or None,
+            "live": live_url(config, hotel),
+        })
+        
+        st_copy = state.copy()
+        st_copy["pause"] = round(pause, 2)
+        st_copy.update({"hotel": hotel, "cursor": res, "partial": part, "swept": swp if part else 0,
+                        "last_run": datetime.now(timezone.utc).isoformat(timespec="seconds")})
+        save_json(site / "estado.json", st_copy)
+
     for start in range(0, len(queue), BATCH_SIZE):
         if time.monotonic() - started > TIME_BUDGET_MIN * 60:
             print(f"Se alcanzó el límite de {TIME_BUDGET_MIN:g} min; se guarda lo avanzado y la próxima corrida sigue.")
@@ -401,33 +435,9 @@ def run(site: Path, hotel: str, full_scan: bool, config: dict, hotels: list[str]
         if done // 1000 > (done - len(chunk)) // 1000:
             mins = (time.monotonic() - started) / 60
             print(f"  {done:,} de {len(queue):,}  ({mins:.0f} min, {found_total:,} con ventas)")
+            checkpoint(done)
 
-    for key in list(targets) + list(launches):  # avisos y lanzamientos sin ventas también aparecen
-        if key in launches and key in items:
-            items[key]["f"] = launches[key]
-        items.setdefault(key, {"n": names.get(key, key.split(":", 1)[1]), "c": key.split(":", 1)[1],
-                               "t": key.split(":", 1)[0], "p": None, "a": None, "s": 0, "o": None, "sp": [],
-                               **({"f": launches[key]} if key in launches else {})})
-
-    save_json(site / "indice.json", {
-        "hotel": hotel, "hoteles": hotels, "fee_pct": config.get("comision_pct", 1),
-        "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "targets": targets, "catalog_size": len(catalog), "items": items,
-        "bot": (config.get("telegram_bot") or "").lstrip("@") or None,
-        "live": live_url(config, hotel),
-    })
-    processed = max(0, done - len(priority))
-    scanned = scan_items[processed - 1][0] + 1 if processed else 0  # posiciones del catálogo ya cubiertas
-    if stopped and all_keys:
-        resume = (cursor + scanned) % len(all_keys)
-    else:
-        resume = next_cursor
-    swept = (int(state.get("swept", 0)) if state.get("partial") else 0) + scanned
-    partial = bool(stopped and full_mode and swept < len(all_keys))
-    state["pause"] = round(pause, 2)  # la próxima corrida arranca al ritmo que funcionó
-    state.update({"hotel": hotel, "cursor": resume, "partial": partial, "swept": swept if partial else 0,
-                  "last_run": datetime.now(timezone.utc).isoformat(timespec="seconds")})
-    save_json(site / "estado.json", state)
+    checkpoint(done)
     print(f"Listo: {done:,} consultados, {found_total:,} con datos, {len(items):,} furnis en la página. "
           f"Habbo pidió ir lento {rate_limited} veces; pausa final {pause:.1f} s.")
 
