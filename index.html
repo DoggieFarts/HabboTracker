@@ -825,15 +825,33 @@
   function pct(v) { return (v > 0 ? "+" : "") + Math.round(v * 100) + "%"; }
   function pct1(v) { return (v > 0 ? "+" : "") + (v * 100).toFixed(1) + "%"; }
 
+  // Icono del furni: images.habbo.com/dcr/hof_furni/<revisión>/<classname>_icon.png
+  // (la revisión sale del catálogo de Habbo y llega en s.r). Si falla, se prueba con la clase base
+  // (sin el *color) y, si tampoco, se muestra un recuadro vacío en vez de una imagen rota.
   function getIcon(s) {
     if (!s) return "";
     const c = s.c || (s.key ? s.key.split(":")[1] : "");
-    if (!c) return "";
-    const hotel = index?.hotel || "habbo.es";
-    const domain = hotel.includes("habbo.") ? (hotel.startsWith("www.") ? hotel : "www." + hotel) : `www.habbo.${hotel}`;
-    const cls = c.split("*")[0];
-    return `https://${domain}/habbo-imaging/furni?typeid=${cls}`;
+    if (!c || !s.r) return "";
+    return `https://images.habbo.com/dcr/hof_furni/${s.r}/${c.replace(/\*/g, "_")}_icon.png`;
   }
+  function getIconAlt(s) {
+    if (!s) return "";
+    const c = s.c || (s.key ? s.key.split(":")[1] : "");
+    if (!c || !s.r || !c.includes("*")) return "";
+    return `https://images.habbo.com/dcr/hof_furni/${s.r}/${c.split("*")[0]}_icon.png`;
+  }
+  function iconAttrs(s) {
+    const src = getIcon(s), alt = getIconAlt(s);
+    if (!src) return 'style="visibility:hidden"';
+    return `src="${src}" data-alt="${alt}" referrerpolicy="no-referrer"`;
+  }
+  document.addEventListener("error", (ev) => {
+    const img = ev.target;
+    if (!(img instanceof HTMLImageElement) || !img.closest(".furni-icon")) return;
+    const alt = img.dataset.alt;
+    if (alt && img.src !== alt) { img.src = alt; img.dataset.alt = ""; }
+    else img.style.visibility = "hidden";
+  }, true);
 
   function enrich(k, e) {
     const s = { key: k, ...e };
@@ -870,7 +888,7 @@
     return `<tr data-key="${s.key}">
       <td>
         <div class="furni-cell">
-          <div class="furni-icon"><img src="${getIcon(s)}" loading="lazy"></div>
+          <div class="furni-icon"><img ${iconAttrs(s)} loading="lazy"></div>
           <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div>
         </div>
       </td>
@@ -934,14 +952,20 @@
       .sort((a, b) => b.expected - a.expected);
     
     if (!picks.length) {
-      $("radar").innerHTML = `<div class="empty"><strong>Buscando señales...</strong>El radar necesita más datos históricos para generar nuevas predicciones confiables.</div>`;
+      const pr = prediction || {};
+      const detail = pr.test_weeks
+        ? `Última prueba (${pr.test_weeks} semanas): señales ${pct1(pr.picks_ret)} vs mercado ${pct1(pr.market_ret)} a ${pr.horizon_days} días, ` +
+          `le ganan al mercado ${Math.round((pr.beat_share || 0) * 100)}% de las semanas y aciertan ${Math.round((pr.hit_rate || 0) * 100)}%. ` +
+          `Solo se publican recomendaciones cuando le ganan al mercado con claridad.`
+        : (pr.reason || "El radar necesita más datos históricos para generar predicciones confiables.");
+      $("radar").innerHTML = `<div class="empty"><strong>Sin recomendaciones por ahora</strong>${detail}</div>`;
       return;
     }
 
     $("radar").innerHTML = picks.slice(0, 12).map((s) => {
       return `<div class="radar-card" style="cursor:pointer" onclick="location.hash='${s.key}'">
         <div class="furni-cell" style="margin-bottom:16px">
-          <div class="furni-icon"><img src="${getIcon(s)}"></div>
+          <div class="furni-icon"><img ${iconAttrs(s)}></div>
           <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div>
         </div>
         <div class="label">Crecimiento Estimado</div>
@@ -968,7 +992,7 @@
       const s = all.find(x => x.key === e.key) || { name: "Furni Desconocido", c: e.key.split(":")[1] };
       return `<tr onclick="location.hash='${e.key}'">
         <td><div class="furni-cell">
-          <div class="furni-icon"><img src="${getIcon(s)}"></div>
+          <div class="furni-icon"><img ${iconAttrs(s)}></div>
           <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c || e.key.split(":")[1])}</span></div>
         </div></td>
         <td><div class="price-val">${e.price || "—"}</div></td>
@@ -996,7 +1020,7 @@
           state = d < -0.02 ? `<span class="delta-pill up">−${Math.abs(Math.round(d * 100))}% vs max</span>` : `<span class="delta-pill down">máximo</span>`;
         }
         return `<tr onclick="location.hash='${s.key}'">
-          <td><div class="furni-cell"><div class="furni-icon"><img src="${getIcon(s)}"></div><div>${esc(s.name)}</div></div></td>
+          <td><div class="furni-cell"><div class="furni-icon"><img ${iconAttrs(s)}></div><div>${esc(s.name)}</div></div></td>
           <td>${when}</td>
           <td>${fmt(s.sold)}</td>
           <td>${state}</td>
@@ -1282,6 +1306,7 @@
             const r = await fetch(index.live, { cache: "no-store" });
             if (!r.ok) {
                 console.error("Fallo al cargar datos en vivo:", r.status, r.statusText);
+                $("live-indicator").hidden = true;
                 return;
             }
             const data = await r.json();
@@ -1306,7 +1331,11 @@
                 $("detail-price").parentElement.querySelector(".delta-pill").textContent = delta ? pct(delta) : "est.";
             }
           } catch (e) {
-            console.error("Error en conexión en vivo:", e);
+            console.error("Error en conexión en vivo (¿CORS, certificado o servidor caído?):", e);
+            $("live-indicator").hidden = true;
+            if (view === "live" && !live) {
+              $("live-rows").innerHTML = `<tr><td colspan="4" class="empty">El servidor en vivo no responde. La página sigue con los datos publicados por GitHub.</td></tr>`;
+            }
           }
         };
         loadLive();
@@ -1362,7 +1391,7 @@
           <tbody>
             ${picks.map(p => `<tr data-key="${p.key}">
               <td><div class="furni-cell">
-                <div class="furni-icon"><img src="${getIcon(p)}"></div>
+                <div class="furni-icon"><img ${iconAttrs(p)}></div>
                 <div>${esc(p.name)}</div>
               </div></td>
               <td><div class="price-val">${fmt(p.fair)}</div></td>
