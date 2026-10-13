@@ -4,9 +4,18 @@
 # usa el index.html del repo como respaldo.
 set -euo pipefail
 mensaje="${1:-Datos del $(date -u +%F)}"
-if [ ! -f sitio/index.html ]; then
-  cp index.html sitio/index.html
-fi
+# 1. Asegurar que la UI más reciente del repositorio se use en la publicación.
+# Sobreescribimos siempre para que los cambios en index.html se reflejen.
+cp index.html sitio/index.html
+
+# 2. Si hay subdirectorios para otros hoteles, también les ponemos el index.html
+# Esto permite que habbomarket.live/habbo.com/ funcione con la misma interfaz.
+for d in sitio/*/ ; do
+    if [ -d "$d" ]; then
+        cp index.html "$d/index.html"
+    fi
+done
+
 printf "habbomarket.live" > sitio/CNAME
 cd sitio
 rm -rf .git
