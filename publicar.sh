@@ -7,6 +7,7 @@ mensaje="${1:-Datos del $(date -u +%F)}"
 if [ ! -f sitio/index.html ]; then
   cp index.html sitio/index.html
 fi
+printf "habbomarket.live" > sitio/CNAME
 cd sitio
 rm -rf .git
 git init --quiet -b datos
