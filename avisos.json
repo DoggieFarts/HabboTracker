@@ -1,10 +1,12 @@
 {
   "hotel": "habbo.es",
-  "hoteles": ["habbo.es", "habbo.com"],
+  "hoteles": [
+    "habbo.es",
+    "habbo.com"
+  ],
   "comision_pct": 1,
   "en_vivo_url": {
-    "habbo.es": "https://habbotracker-doggiefarts.mexicocentral.cloudapp.azure.com/habbo.es/vivo.json",
-    "habbo.com": "https://habbotracker-doggiefarts.mexicocentral.cloudapp.azure.com/habbo.com/vivo.json"
+    "habbo.es": "https://habbotracker-doggiefarts.mexicocentral.cloudapp.azure.com/vivo.json"
   },
   "telegram_bot": "",
   "vigia": {
