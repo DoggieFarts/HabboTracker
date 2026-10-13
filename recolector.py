@@ -326,6 +326,7 @@ def run(site: Path, hotel: str, full_scan: bool, config: dict, hotels: list[str]
                                    **({"f": launches[key]} if key in launches else {})})
 
         processed = max(0, done - len(priority))
+        items_updated = datetime.now(timezone.utc).isoformat(timespec="seconds")
         # posiciones del catálogo ya cubiertas
         curr_scanned = scan_items[processed - 1][0] + 1 if processed else 0
         if stopped and all_keys:
@@ -336,11 +337,12 @@ def run(site: Path, hotel: str, full_scan: bool, config: dict, hotels: list[str]
         swp = (int(state.get("swept", 0)) if state.get("partial") else 0) + curr_scanned
         part = bool(stopped and full_mode and swp < len(all_keys))
         
+        print(f"Guardando índice: {len(items):,} furnis, hotel {hotel}, actualizado: {items_updated}")
         save_json(site / "indice.json", {
             "hotel": hotel, 
             "hotels": {h: {"name": h.upper(), "url": "/" if j == 0 else f"/{h}/"} for j, h in enumerate(hotels)},
             "fee_pct": config.get("comision_pct", 1),
-            "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "updated": items_updated,
             "targets": targets, "catalog_size": len(catalog), "items": items,
             "bot": (config.get("telegram_bot") or "").lstrip("@") or None,
             "live": live_url(config, hotel),

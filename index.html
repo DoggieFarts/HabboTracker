@@ -826,9 +826,13 @@
   function pct1(v) { return (v > 0 ? "+" : "") + (v * 100).toFixed(1) + "%"; }
 
   function getIcon(s) {
+    if (!s) return "";
+    const c = s.c || (s.key ? s.key.split(":")[1] : "");
+    if (!c) return "";
     const hotel = index?.hotel || "habbo.es";
     const domain = hotel.includes("habbo.") ? (hotel.startsWith("www.") ? hotel : "www." + hotel) : `www.habbo.${hotel}`;
-    return `https://${domain}/habbo-imaging/furni?typeid=${s.c}`;
+    const cls = c.split("*")[0];
+    return `https://${domain}/habbo-imaging/furni?typeid=${cls}`;
   }
 
   function enrich(k, e) {
@@ -842,15 +846,14 @@
     s.launched = s.f;
     s.perDay = s.sold / 30;
     s.hasFair = s.fair != null;
+    s.delta = s.price && s.fair ? (s.price - s.fair) / s.fair : null;
     if (index.live) applyLiveTo(s);
-    else {
-      s.delta = s.price && s.fair ? (s.price - s.fair) / s.fair : null;
-    }
     return s;
   }
 
   function applyLiveTo(s) {
-    const v = live && live.items && live.items[s.key];
+    if (!live || !live.items) return false;
+    const v = live.items[s.key];
     if (!v) return false;
     const [p, o, age] = v;
     s.price = p || null;
@@ -1238,10 +1241,12 @@
   });
 
   // ---- Initial Fetch ----
+  console.log("Cargando HabboMarket UI...");
   fetch(`indice.json?t=${Date.now()}`)
     .then(r => r.json())
     .then(json => {
       index = json;
+      console.log("Índice cargado:", index.hotel, "Items:", Object.keys(index.items || {}).length, "Actualizado:", index.updated);
       all = Object.entries(index.items || {}).map(([k, e]) => enrich(k, e));
       
       $("hero-count").textContent = fmt(all.length);
@@ -1271,27 +1276,48 @@
       route();
 
       if (index.live) {
+        console.log("Iniciando seguimiento en vivo:", index.live);
         const loadLive = async () => {
           try {
             const r = await fetch(index.live, { cache: "no-store" });
-            if (!r.ok) return;
+            if (!r.ok) {
+                console.error("Fallo al cargar datos en vivo:", r.status, r.statusText);
+                return;
+            }
             const data = await r.json();
+            console.log("Datos en vivo recibidos:", Object.keys(data.items || {}).length, "furnis");
             live = data;
             all.forEach(applyLiveTo);
             $("live-indicator").hidden = false;
             const badge = document.querySelector(".nexora-badge");
-            const hotel = $("hotel-name").textContent;
-            badge.textContent = `Habbo Market ${hotel} — En Vivo`;
+            const hotelName = $("hotel-name").textContent;
+            badge.textContent = `Habbo Market ${hotelName} — En Vivo`;
             badge.classList.add("live");
             badge.style.borderColor = "var(--green)";
             badge.style.color = "var(--green)";
             if (view === "market") renderList();
             if (view === "live") renderLiveTab();
-          } catch (e) {}
+            if (current) {
+                // Si el furni actual tiene precio en vivo, actualizar vista
+                $("detail-price").textContent = current.price ? fmt(current.price) : "—";
+                const delta = current.delta;
+                const deltaClass = !delta ? "flat" : delta < -0.05 ? "up" : delta > 0.05 ? "down" : "flat";
+                $("detail-price").parentElement.querySelector(".delta-pill").className = `delta-pill ${deltaClass}`;
+                $("detail-price").parentElement.querySelector(".delta-pill").textContent = delta ? pct(delta) : "est.";
+            }
+          } catch (e) {
+            console.error("Error en conexión en vivo:", e);
+          }
         };
         loadLive();
         setInterval(loadLive, LIVE_EVERY);
+      } else {
+        console.warn("No se configuró URL de datos en vivo para este hotel.");
       }
+    })
+    .catch(err => {
+        console.error("Error crítico cargando la aplicación:", err);
+        $("market-title").innerHTML = `<span style="color:var(--red)">Error al cargar datos. Reintente en unos minutos.</span>`;
     });
 
   // Budget logic simplified for this example
