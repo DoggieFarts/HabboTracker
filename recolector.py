@@ -150,6 +150,7 @@ def refresh_catalog(site: Path, hotel: str) -> list[list[str]]:
     path = site / "catalogo.json"
     current = load_json(path, {})
     if (current.get("hotel") == hotel and current.get("updated") and current.get("furnis") and
+            current.get("revisions") and
             date.today() - date.fromisoformat(current["updated"]) < timedelta(days=CATALOG_MAX_AGE_DAYS)):
         return current["furnis"]
     try:
@@ -157,13 +158,16 @@ def refresh_catalog(site: Path, hotel: str) -> list[list[str]]:
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
         print(f"No se pudo descargar el catálogo de furnis: {e}")
         return current.get("furnis", []) if current.get("hotel") == hotel else []
-    furnis, seen = [], set()
+    furnis, seen, revisions = [], set(), {}
     for key, kind in (("roomitemtypes", "room"), ("wallitemtypes", "wall")):
         for f in (raw.get(key) or {}).get("furnitype", []):
             cls = f.get("classname")
             if cls and (kind, cls) not in seen:
                 seen.add((kind, cls))
                 furnis.append([(f.get("name") or "").strip() or cls, cls, kind])
+                rev = to_int(f.get("revision"))
+                if rev:
+                    revisions[f"{kind}:{cls}"] = rev
     furnis.sort(key=lambda x: (x[2], x[1]))
     previous = {f"{k}:{c}" for _, c, k in current.get("furnis", [])} if current.get("hotel") == hotel else set()
     new_keys = [f"{k}:{c}" for _, c, k in furnis if f"{k}:{c}" not in previous] if previous else []
@@ -175,7 +179,7 @@ def refresh_catalog(site: Path, hotel: str) -> list[list[str]]:
         launches.setdefault(key, today)
     cutoff = (date.today() - timedelta(days=LAUNCH_DAYS * 2)).isoformat()
     save_json(site / "lanzamientos.json", {k: d for k, d in launches.items() if d >= cutoff})
-    save_json(path, {"hotel": hotel, "updated": today, "furnis": furnis})
+    save_json(path, {"hotel": hotel, "updated": today, "furnis": furnis, "revisions": revisions})
     print(f"Catálogo actualizado: {len(furnis):,} furnis" + (f", {len(new_keys)} nuevos." if new_keys else "."))
     return furnis
 
@@ -264,6 +268,7 @@ def run(site: Path, hotel: str, full_scan: bool, config: dict, hotels: list[str]
 
     catalog = refresh_catalog(site, hotel)
     names = {f"{k}:{c}": n for n, c, k in catalog}
+    revisions = load_json(site / "catalogo.json", {}).get("revisions", {})
     launch_cut = (date.today() - timedelta(days=LAUNCH_DAYS)).isoformat()
     launches = {k: d for k, d in load_json(site / "lanzamientos.json", {}).items() if d >= launch_cut}
 
@@ -337,6 +342,9 @@ def run(site: Path, hotel: str, full_scan: bool, config: dict, hotels: list[str]
         swp = (int(state.get("swept", 0)) if state.get("partial") else 0) + curr_scanned
         part = bool(stopped and full_mode and swp < len(all_keys))
         
+        for key, it in items.items():  # revisión del catálogo: sirve para armar la URL del icono
+            if revisions.get(key):
+                it["r"] = revisions[key]
         print(f"Guardando índice: {len(items):,} furnis, hotel {hotel}, actualizado: {items_updated}")
         save_json(site / "indice.json", {
             "hotel": hotel, 

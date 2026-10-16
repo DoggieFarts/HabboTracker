@@ -1306,14 +1306,17 @@
             const r = await fetch(index.live, { cache: "no-store" });
             if (!r.ok) {
                 console.error("Fallo al cargar datos en vivo:", r.status, r.statusText);
-                $("live-indicator").hidden = true;
+                showLiveProblem(`el servidor respondió ${r.status}`);
                 return;
             }
             const data = await r.json();
             console.log("Datos en vivo recibidos:", Object.keys(data.items || {}).length, "furnis");
             live = data;
             all.forEach(applyLiveTo);
-            $("live-indicator").hidden = false;
+            const ind = $("live-indicator");
+            ind.classList.remove("offline");
+            ind.querySelector("span:last-child").textContent = "EN VIVO";
+            ind.hidden = false;
             const badge = document.querySelector(".nexora-badge");
             const hotelName = $("hotel-name").textContent;
             badge.textContent = `Habbo Market ${hotelName} — En Vivo`;
@@ -1325,19 +1328,31 @@
             if (current) {
                 // Si el furni actual tiene precio en vivo, actualizar vista
                 $("detail-price").textContent = current.price ? fmt(current.price) : "—";
-                const delta = current.delta;
-                const deltaClass = !delta ? "flat" : delta < -0.05 ? "up" : delta > 0.05 ? "down" : "flat";
-                $("detail-price").parentElement.querySelector(".delta-pill").className = `delta-pill ${deltaClass}`;
-                $("detail-price").parentElement.querySelector(".delta-pill").textContent = delta ? pct(delta) : "est.";
+                const pill = $("detail-price").parentElement.querySelector(".delta-pill");
+                if (pill) {   // antes fallaba aquí si el detalle no tenía esta etiqueta, y apagaba el "EN VIVO"
+                  const delta = current.delta;
+                  pill.className = `delta-pill ${!delta ? "flat" : delta < -0.05 ? "down" : delta > 0.05 ? "up" : "flat"}`;
+                  pill.textContent = delta ? pct(delta) : "est.";
+                }
             }
           } catch (e) {
             console.error("Error en conexión en vivo (¿CORS, certificado o servidor caído?):", e);
-            $("live-indicator").hidden = true;
+            showLiveProblem("no se pudo conectar con el servidor");
             if (view === "live" && !live) {
               $("live-rows").innerHTML = `<tr><td colspan="4" class="empty">El servidor en vivo no responde. La página sigue con los datos publicados por GitHub.</td></tr>`;
             }
           }
         };
+        function showLiveProblem(reason) {
+          const ind = $("live-indicator");
+          ind.classList.add("offline");
+          ind.querySelector("span:last-child").textContent = "SIN EN VIVO";
+          ind.title = `Precios en vivo no disponibles: ${reason}`;
+          ind.hidden = false;
+          if (view === "live" && !live) {
+            $("live-rows").innerHTML = `<tr><td colspan="4" class="empty">Precios en vivo no disponibles (${esc(reason)}). La página sigue con los datos publicados por GitHub.</td></tr>`;
+          }
+        }
         loadLive();
         setInterval(loadLive, LIVE_EVERY);
       } else {
