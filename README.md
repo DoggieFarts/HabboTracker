@@ -7,7 +7,9 @@ Rastreador público de precios del Mercadillo de Habbo (por ejemplo `habbo.es` y
 - **Mercado:** todos los furnis con ventas, con su precio justo (mediana de 30 días), rango normal, minigráfica de 30 días y días para revender. Buscador de los ~18,000 furnis de cada hotel.
 - **Lanzamientos:** furnis nuevos de los últimos 30 días y cuánto han bajado desde su máximo.
 - **Presupuesto:** arma una lista de compras según tus créditos y en cuánto quieres revender.
-- **Radar:** furnis cuyas señales (menos ofertas, más ventas, tendencia, caídas que se corrigen) solían venir antes de una subida. Se prueba en cada actualización contra el último año, sin mirar el futuro, y solo recomienda si le gana al mercado con claridad.
+- **Radar:** furnis cuyas señales (menos ofertas, más ventas, tendencia, caídas que se corrigen) solían venir antes de una subida. Compiten tres modelos: señales lineales, XGBoost (~20 señales, incluido el precio en el otro hotel) y la mezcla de ambos. Se prueban en cada actualización contra el último año sin mirar el futuro, comprando en los 3 días *siguientes* a la señal, y solo se recomienda si el mejor le gana al mercado con claridad y además deja ganancia.
+- **Índice del mercado:** cómo se mueve el precio del furni típico contra su propio nivel de los últimos dos años, con su cambio a 7, 30 y 90 días.
+- **Pronóstico por furni:** rango probable del precio dentro de 14 días (XGBoost por cuantiles) y la probabilidad de ganar si compras al precio actual, ya con comisión. Se dibuja en la gráfica del detalle.
 - **Historial de 2 años** por furni, traído de habboapi.site. La gráfica muestra los datos de cada día al pasar el mouse y tiene rangos de 7 días a todo el historial.
 
 ## Archivos
@@ -17,7 +19,8 @@ Rastreador público de precios del Mercadillo de Habbo (por ejemplo `habbo.es` y
 | `index.html` | La página. |
 | `recolector.py` | Consulta precios en Habbo. |
 | `historial.py` | Rellena el historial de 2 años desde habboapi.site. |
-| `prediccion.py` | El radar: calcula señales, las prueba contra el último año y publica recomendaciones solo si le ganan al mercado. |
+| `prediccion.py` | El radar: calcula señales, prueba los modelos contra el último año y publica recomendaciones solo si le ganan al mercado. Escribe `prediccion.json` y `pronostico.json`. |
+| `modelo.py` | Índice del mercado, retador XGBoost y pronóstico por cuantiles. Si `xgboost` no está instalado, el radar sigue solo con las señales lineales. |
 | `publicar.sh` | Publica los datos en la rama `datos`, que es la que muestra Pages. |
 | `avisos.json` | Configuración: hoteles, comisión del Mercadillo y dirección de los precios en vivo. |
 | `en_vivo.py` | Corre sin parar en una máquina virtual de Azure y mantiene los precios en vivo. |

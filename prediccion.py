@@ -34,6 +34,8 @@ from pathlib import Path
 
 import numpy as np
 
+import modelo
+
 HORIZON = 14          # días entre la compra y la venta en la prueba
 STEP = 7              # una fecha de prueba por semana
 LOOKBACK = 90         # días de historia que necesita cada señal
@@ -165,10 +167,20 @@ def features_at(P, S, O, t: int, season=None):
     return feats, raw, universe
 
 
-def forward_return(P, t: int, entry, fee: float):
-    """Ganancia neta si compras al último precio y vendes a la mediana de los días alrededor de t + HORIZON."""
-    exit_ = np.nanmedian(P[:, t + HORIZON - 3:t + HORIZON + 4], axis=1)
-    return exit_ * (1 - fee) / entry - 1
+def entry_price(P, t: int):
+    """Precio al que de verdad se compra: la mediana de los 3 días siguientes a la señal. Comprar al último
+    precio del día t premiaría los días con una venta rara a precio regalado, que ya no está cuando la ves."""
+    return np.nanmedian(P[:, t + 1:t + 4], axis=1)
+
+
+def exit_price(P, t: int):
+    """Venta: la mediana de los días alrededor de t + HORIZON."""
+    return np.nanmedian(P[:, t + HORIZON - 3:t + HORIZON + 4], axis=1)
+
+
+def forward_return(P, t: int, fee: float):
+    """Ganancia neta, ya con comisión, si ves la señal el día t, compras en los días siguientes y vendes 14 días después."""
+    return exit_price(P, t) * (1 - fee) / entry_price(P, t) - 1
 
 
 def zrank(x: np.ndarray) -> np.ndarray:
@@ -200,11 +212,10 @@ def season_table(P, S, themes, fee: float, today_index: int) -> dict:
     """Para cada tema y cada semana: cuánto le ganaron (o perdieron) sus furnis al mercado en 14 días."""
     table = {k: {} for k in range(len(THEMES))}
     for d in range(29, today_index - HORIZON - 3, STEP):
-        last = last_price(P, d)
         med30 = np.nanmedian(P[:, d - 29:d + 1], axis=1)
         sold30 = S[:, d - 29:d + 1].sum(axis=1)
         price_days = np.sum(~np.isnan(P[:, d - 29:d + 1]), axis=1)
-        fwd = forward_return(P, d, last, fee)
+        fwd = forward_return(P, d, fee)
         # universo más amplio que el del radar: los furnis de temporada se venden poco fuera de ella
         base = (sold30 >= 10) & (med30 >= MIN_PRICE) & (price_days >= 5) & np.isfinite(fwd)
         if base.sum() < 50:
@@ -249,24 +260,86 @@ def season_calendar(table: dict, themes, start: date) -> list:
 # prueba contra el pasado
 # ---------------------------------------------------------------------------
 
-def backtest(P, S, O, themes, table: dict, fee: float, today_index: int):
-    dates = list(range(LOOKBACK - 1, today_index - HORIZON - 3, STEP))
-    rows = []  # por fecha: señales (rango), retorno futuro
-    for t in dates:
+FEATS = SIGNALS + modelo.EXTRA + ["tema"]   # lo que ve el retador XGBoost
+
+
+def other_hotel_prices(other_site: Path | None, keys: list, start: date):
+    """Precios diarios del mismo furni en el otro hotel, alineados con keys (nan si no está)."""
+    if not other_site or not (other_site / "h").exists():
+        return None
+    Po = np.full((len(keys), MAX_DAYS), np.nan, dtype=np.float32)
+    found = 0
+    for r, key in enumerate(keys):
+        kind, cls = key.split(":", 1)
+        days = load_json(other_site / "h" / kind / f"{file_name(cls)}.json", {}).get("d", {})
+        for d, row in days.items():
+            try:
+                i = (date.fromisoformat(d) - start).days
+            except ValueError:
+                continue
+            if 0 <= i < MAX_DAYS and row[0]:
+                Po[r, i] = row[0]
+        found += bool(days)
+    print(f"Otro hotel: {found:,} de {len(keys):,} furnis con historial.")
+    return (lambda t: np.nanmedian(Po[:, t - 29:t + 1], axis=1)) if found else None
+
+
+def week_rows(P, S, O, themes, table: dict, fee: float, today_index: int, first, other_med30):
+    """Para cada semana con respuesta conocida: señales, ganancia a 14 días y la matriz del retador."""
+    rows = []
+    for t in range(LOOKBACK - 1, today_index - HORIZON - 3, STEP):
         feats, raw, uni = features_at(P, S, O, t, season_feature(t, themes, table))
-        fwd = forward_return(P, t, raw["last"], fee)
+        fwd = forward_return(P, t, fee)
         mask = uni & np.isfinite(fwd)
         if mask.sum() < 50:
             continue
-        z = {k: zrank(v[mask]) for k, v in feats.items()}
-        rows.append({"t": t, "z": z, "fwd": fwd[mask]})
+        row = {"t": t, "z": {k: zrank(v[mask]) for k, v in feats.items()}, "fwd": fwd[mask]}
+        if modelo.available():
+            allf = {**feats, **modelo.extra_features(P, raw, t, first, other_med30)}
+            row["X"] = np.column_stack([modelo.rank_matrix(allf, FEATS[:-1], mask), themes[mask]])
+            row["y"] = zrank(row["fwd"])
+        rows.append(row)
+    return rows
+
+
+def evaluate(rows: list, idxs: list, scores: dict) -> dict:
+    """Simula comprar los TOP_N con mejor puntaje cada semana y venderlos 14 días después."""
+    picks_ret, market_ret, hits, excess, bins = [], [], [], [], []
+    for i in idxs:
+        r, score = rows[i], scores[i]
+        top = np.argsort(-score)[:TOP_N]
+        # medianas y no promedios: con promedios, los furnis más volátiles parecen mejores por pura varianza
+        pr, mk = float(np.median(r["fwd"][top])), float(np.median(r["fwd"]))
+        picks_ret.append(pr)
+        market_ret.append(mk)
+        hits.append(float(np.mean(r["fwd"][top] > 0)))
+        excess.append(pr - mk)
+        bins.extend(zip(zrank(score).tolist(), r["fwd"].tolist()))
+    bins.sort()
+    n = len(bins)
+    deciles = []
+    for k in range(10):
+        chunk = bins[k * n // 10:(k + 1) * n // 10]
+        deciles.append(float(np.median([f for _, f in chunk])) if chunk else 0.0)
+    ex = np.array(excess)
+    half = len(ex) // 2
+    return {
+        "picks_ret": float(np.mean(picks_ret)), "market_ret": float(np.mean(market_ret)),
+        "hit_rate": float(np.mean(hits)), "beat_share": float(np.mean(ex > 0)), "weeks": len(ex),
+        # qué tan distinto de cero es el exceso semanal: más de 2 es difícil que sea suerte
+        "t_stat": float(ex.mean() / (ex.std(ddof=1) / math.sqrt(len(ex)))) if len(ex) > 2 and ex.std() > 0 else 0.0,
+        "excess": float(ex.mean()),
+        "excess_halves": [float(ex[:half].mean()), float(ex[half:].mean())] if half else [0.0, 0.0],
+        "deciles": deciles,
+    }
+
+
+def backtest(rows: list):
     if len(rows) < 10:
         return None
-
     # qué tanto acertó cada señal en cada semana (correlación de rangos con la subida futura)
     row_ic = {k: np.array([spearman(r["z"][k], r["fwd"]) for r in rows]) for k in SIGNALS}
     half = len(rows) // 2
-    test_idx = range(half, len(rows))
 
     def weights_before(i: int) -> dict:
         """Pesos con las semanas anteriores a la fila i que ya terminaron: nunca se usa el futuro."""
@@ -279,46 +352,90 @@ def backtest(P, S, O, themes, table: dict, fee: float, today_index: int):
             w[k] = float(np.mean(vals)) if len(vals) else 0.0
         return w
 
-    picks_ret, market_ret, hits, beats, excess = [], [], [], 0, []
-    score_bins: list[tuple[float, float]] = []
-    for i in test_idx:
-        r, w = rows[i], weights_before(i)
-        score = sum(w[k] * r["z"][k] for k in SIGNALS)
-        top = np.argsort(-score)[:TOP_N]
-        # medianas y no promedios: con promedios, los furnis más volátiles parecen mejores por pura varianza
-        pr, mk = float(np.median(r["fwd"][top])), float(np.median(r["fwd"]))
-        picks_ret.append(pr)
-        market_ret.append(mk)
-        hits.append(float(np.mean(r["fwd"][top] > 0)))
-        beats += pr > mk
-        excess.append(pr - mk)
-        score_bins.extend(zip(zrank(score).tolist(), r["fwd"].tolist()))
-
-    score_bins.sort()
-    deciles = []
-    n = len(score_bins)
-    for i in range(10):
-        chunk = score_bins[i * n // 10:(i + 1) * n // 10]
-        deciles.append(float(np.median([f for _, f in chunk])) if chunk else 0.0)
-
+    candidates = {"lineal": {}}
+    for i in range(half, len(rows)):
+        w = weights_before(i)
+        candidates["lineal"][i] = sum(w[k] * rows[i]["z"][k] for k in SIGNALS)
+    if modelo.available() and "X" in rows[0]:
+        print("Probando el retador XGBoost semana a semana…", flush=True)
+        candidates["xgboost"] = modelo.walk_forward_scores(rows, half, HORIZON)
+        candidates["mezcla"] = {i: zrank(candidates["lineal"][i]) + zrank(s)
+                                for i, s in candidates["xgboost"].items()}
+    # todos se miden en las mismas semanas
+    idxs = sorted(set.intersection(*(set(c) for c in candidates.values())))
+    results = {name: evaluate(rows, idxs, sc) for name, sc in candidates.items()}
+    # el lineal es el de siempre; otro modelo lo reemplaza solo si le gana en las dos mitades de la prueba,
+    # para no elegir al que tuvo suerte en unas cuantas semanas
+    chosen = "lineal"
+    for name, res in results.items():
+        base = results["lineal"]
+        if (name != "lineal" and all(a > b for a, b in zip(res["excess_halves"], base["excess_halves"]))
+                and res["excess"] > results[chosen]["excess"]):
+            chosen = name
     weights_all = {}
     for k in SIGNALS:
         vals = row_ic[k][np.isfinite(row_ic[k])]
         weights_all[k] = float(np.mean(vals)) if len(vals) else 0.0
-    n_test = len(test_idx)
     return {
         "ic": {k: (float(np.nanmean(v)) if np.isfinite(v).any() else 0.0) for k, v in row_ic.items()},
         "weights_all": weights_all,
-        "test_dates": n_test,
-        "picks_ret": float(np.mean(picks_ret)),
-        "market_ret": float(np.mean(market_ret)),
-        "hit_rate": float(np.mean(hits)),
-        "beat_share": beats / n_test,
-        # qué tan distinto de cero es el exceso semanal: más de 2 es difícil que sea suerte
-        "t_stat": float(np.mean(excess) / (np.std(excess, ddof=1) / math.sqrt(len(excess)))) if len(excess) > 2 and np.std(excess) > 0 else 0.0,
-        "deciles": deciles,
-        "first_t": rows[0]["t"], "test_first_t": rows[half]["t"], "last_t": rows[-1]["t"],
+        "models": results, "chosen": chosen, **results[chosen], "test_dates": len(idxs),
+        "first_t": rows[0]["t"], "test_first_t": rows[idxs[0]]["t"], "last_t": rows[-1]["t"],
     }
+
+
+# ---------------------------------------------------------------------------
+# pronóstico por furni
+# ---------------------------------------------------------------------------
+
+def forecast_universe(raw: dict, P, t: int):
+    """Más amplio que el del radar: cualquier furni que se venda con cierta frecuencia."""
+    price_days = np.sum(~np.isnan(P[:, t - 29:t + 1]), axis=1)
+    return (raw["sold30"] >= 10) & (raw["med30"] >= MIN_PRICE) & (price_days >= 5) & np.isfinite(raw["last"])
+
+
+def forecast_matrix(P, S, O, themes, table, t, first, other_med30, logidx):
+    feats, raw, _ = features_at(P, S, O, t, season_feature(t, themes, table))
+    allf = {**feats, **modelo.extra_features(P, raw, t, first, other_med30)}
+    reg = modelo.regime_at(logidx, t)
+    n = P.shape[0]
+    cols = [np.asarray(allf[k], dtype=np.float32) for k in FEATS[:-1]]
+    cols += [np.full(n, reg[k], dtype=np.float32) for k in modelo.REGIME] + [themes.astype(np.float32)]
+    X = np.column_stack(cols)
+    X[~np.isfinite(X)] = np.nan
+    return X, raw, forecast_universe(raw, P, t)
+
+
+def build_forecast(P, S, O, themes, table, fee, today, first, other_med30, logidx, test_from_t, keys):
+    """Entrena el pronóstico de rango, lo mide en semanas que no vio y lo aplica a hoy."""
+    # El pronóstico es el precio dentro de 14 días contra la mediana de la última semana (una referencia
+    # estable). La probabilidad de ganar la calcula la página contra el precio al que puedes comprar ahora.
+    Xs, ys, ths, ts = [], [], [], []
+    for t in range(LOOKBACK - 1, today - HORIZON - 3, STEP):
+        X, raw, uni = forecast_matrix(P, S, O, themes, table, t, first, other_med30, logidx)
+        y = np.log(exit_price(P, t) / raw["med7"])
+        # para medirlo: ¿ganaba quien compraba en los días siguientes y vendía entonces, ya con comisión?
+        th = np.log(entry_price(P, t) / (1 - fee) / raw["med7"])
+        m = uni & np.isfinite(y)
+        Xs.append(X[m]); ys.append(y[m]); ths.append(th[m]); ts.append(np.full(m.sum(), t))
+    X, y, th, tt = np.vstack(Xs), np.concatenate(ys), np.concatenate(ths), np.concatenate(ts)
+    train = tt + HORIZON + 3 <= test_from_t
+    test = (tt >= test_from_t) & np.isfinite(th)
+    report = None
+    if train.sum() > 1000 and test.sum() > 1000:
+        q = modelo.predict_quantiles(modelo.fit_quantiles(X[train], y[train]), X[test])
+        report = modelo.quantile_report(q, y[test], th[test])
+        print(f"Pronóstico (semanas no vistas): el rango 10–90 contuvo el precio real {report['coverage80']:.0%} de las veces, "
+              f"Brier {report['brier']:.3f} contra {report['brier_base']:.3f} sin modelo.")
+    model = modelo.fit_quantiles(X, y)
+    Xt, raw, uni = forecast_matrix(P, S, O, themes, table, today, first, other_med30, logidx)
+    idx = np.where(uni)[0]
+    q = modelo.predict_quantiles(model, Xt[idx])
+    items = {}
+    for j, i in enumerate(idx):
+        ref = float(raw["med7"][i])
+        items[keys[i]] = [int(round(ref * math.exp(v))) for v in q[j]]
+    return {"report": report, "quantiles": modelo.QUANTILES, "items": items}   # items: precios p10, p25, p50, p75, p90
 
 
 # ---------------------------------------------------------------------------
@@ -346,9 +463,36 @@ def reasons(raw: dict, i: int, theme: int | None = None, season_value: float = 0
     return out or ["Varias señales pequeñas a favor al mismo tiempo."]
 
 
+# Cómo se le explica al usuario lo que más pesó en el puntaje del retador XGBoost
+FEATURE_LABELS = {
+    "oferta": "cuántas ofertas abiertas hay", "demanda": "el ritmo de ventas", "impulso": "su tendencia del último mes",
+    "rebote": "su distancia al nivel de 3 meses", "estabilidad": "qué tan estable es su precio",
+    "temporada": "la temporada", "ultimo": "su último precio contra la semana", "impulso7": "su cambio de la semana",
+    "impulso30": "su cambio del mes", "inventario": "los días de inventario en venta", "liquidez": "cuánto se vende",
+    "nivel": "su nivel de precio", "volatil90": "su volatilidad de 3 meses",
+    "vs_max_anual": "su distancia al máximo del año", "vs_min_anual": "su distancia al mínimo del año",
+    "antiguedad": "su antigüedad", "otro_hotel": "su precio en el otro hotel", "tema": "su tema",
+}
+
+
+def model_reason(contrib_row: np.ndarray) -> str | None:
+    order = [k for k in np.argsort(-contrib_row) if contrib_row[k] > 0][:2]
+    if not order:
+        return None
+    names = [FEATURE_LABELS.get(FEATS[k], FEATS[k]) for k in order]
+    return "Lo que más pesó en el modelo: " + " y ".join(names) + "."
+
+
+def round_stats(res: dict) -> dict:
+    return {"picks_ret": round(res["picks_ret"], 4), "market_ret": round(res["market_ret"], 4),
+            "hit_rate": round(res["hit_rate"], 3), "beat_share": round(res["beat_share"], 3),
+            "t_stat": round(res["t_stat"], 2), "excess": round(res["excess"], 4), "weeks": res["weeks"]}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sitio", default="sitio")
+    parser.add_argument("--otro", default=None, help="carpeta del otro hotel, para comparar precios")
     args = parser.parse_args()
     site = Path(args.sitio)
 
@@ -366,13 +510,24 @@ def main() -> int:
         return 0
     today = MAX_DAYS - 1
     print(f"Radar: {len(keys):,} furnis con historial. Probando señales…", flush=True)
+    if not modelo.available():
+        print("xgboost no está instalado: solo se usan las señales lineales y no hay pronóstico.")
+
+    M7 = modelo.rolling_median7(P)
+    logidx = modelo.market_series(M7, S)
+    market = modelo.market_summary(M7, logidx, start, today)
+    print(f"Mercado: {market['change7']:+.1%} en 7 días, {market['change30']:+.1%} en 30, {market['change90']:+.1%} en 90; "
+          f"{(market['breadth'] or 0):.0%} de los furnis arriba de su mediana del mes.")
 
     table = season_table(P, S, themes, fee, today)
     calendar = season_calendar(table, themes, start)
     print("Temporadas:", ", ".join(f"{c['name']} {c['items']} furnis" for c in calendar))
-    bt = backtest(P, S, O, themes, table, fee, today)
+    first = modelo.first_seen(P)
+    other_med30 = other_hotel_prices(Path(args.otro) if args.otro else None, keys, start)
+    rows = week_rows(P, S, O, themes, table, fee, today, first, other_med30)
+    bt = backtest(rows)
     if not bt:
-        out_path.write_text(json.dumps({**base, "enabled": False, "seasons": calendar,
+        out_path.write_text(json.dumps({**base, "enabled": False, "seasons": calendar, "market": market,
                                         "reason": "Todavía no hay suficientes semanas de historial para probar las señales."},
                                        ensure_ascii=False))
         print("Muy pocas fechas para probar.")
@@ -383,7 +538,7 @@ def main() -> int:
     enabled = excess > 0.01 and bt["beat_share"] >= 0.6 and bt["t_stat"] >= 2 and bt["hit_rate"] > 0.5
     day = lambda t: (start + timedelta(days=int(t))).isoformat()  # noqa: E731
     summary = {
-        "enabled": enabled,
+        "enabled": enabled, "model": bt["chosen"],
         "picks_ret": round(bt["picks_ret"], 4), "market_ret": round(bt["market_ret"], 4),
         "hit_rate": round(bt["hit_rate"], 3),
         "beat_share": round(bt["beat_share"], 3), "test_weeks": bt["test_dates"], "t_stat": round(bt["t_stat"], 2),
@@ -391,10 +546,14 @@ def main() -> int:
         "train_from": day(bt["first_t"]),
         "signals": {k: round(v, 3) for k, v in bt["ic"].items()},
         "weights": {k: round(v, 3) for k, v in bt["weights_all"].items()},
+        "models": {k: round_stats(v) for k, v in bt["models"].items()},
     }
-    print(f"Prueba: señales {bt['picks_ret']:+.1%} vs mercado {bt['market_ret']:+.1%} en {HORIZON} días (típico por semana), "
-          f"aciertos {bt['hit_rate']:.0%}, le gana al mercado {bt['beat_share']:.0%} de las semanas "
-          f"({bt['test_dates']} semanas, confianza t={bt['t_stat']:.1f}). "
+    for name, res in bt["models"].items():
+        print(f"  {name:8s} {res['picks_ret']:+.1%} vs mercado {res['market_ret']:+.1%}, aciertos {res['hit_rate']:.0%}, "
+              f"le gana {res['beat_share']:.0%} de las semanas, t={res['t_stat']:.1f}"
+              f"{'  ← elegido' if name == bt['chosen'] else ''}")
+    print(f"Prueba ({bt['chosen']}): {bt['picks_ret']:+.1%} vs mercado {bt['market_ret']:+.1%} en {HORIZON} días, "
+          f"{bt['test_dates']} semanas. "
           f"{'Se publican recomendaciones.' if enabled else 'No le gana al mercado con claridad: no se publican.'}")
     print("Fuerza de cada señal (correlación con la subida futura):",
           ", ".join(f"{k} {v:+.3f}" for k, v in bt["ic"].items()))
@@ -410,16 +569,37 @@ def main() -> int:
         if len(idx):
             z = {k: zrank(v[idx]) for k, v in feats.items()}
             score = sum(bt["weights_all"][k] * z[k] for k in SIGNALS)
+            contrib = None
+            if bt["chosen"] != "lineal":
+                ranker = modelo.fit_ranker(rows)
+                allf = {**feats, **modelo.extra_features(P, raw, today, first, other_med30)}
+                X = np.column_stack([modelo.rank_matrix(allf, FEATS[:-1], mask), themes[mask]])
+                tree = ranker.predict(modelo.xgb.DMatrix(X))
+                score = tree if bt["chosen"] == "xgboost" else zrank(score) + zrank(tree)
+                contrib = modelo.explain(ranker, X, FEATS)
             ranks = zrank(score)
             order = np.argsort(-score)[:PICKS_TODAY]
             for j in order:
                 i = idx[j]
                 decile = min(9, int((ranks[j] + 1) / 2 * 10))
+                why = reasons(raw, i, int(themes[i]), float(season_now[i]))
+                extra = model_reason(contrib[j]) if contrib is not None else None
                 picks.append({"k": keys[i], "score": round(float(ranks[j]), 3),
                               "expected": round(bt["deciles"][decile], 4),
                               "entry": int(round(float(raw["last"][i]))),
-                              "why": reasons(raw, i, int(themes[i]), float(season_now[i]))})
-    result = {**base, **summary, "picks": picks, "seasons": calendar}
+                              "why": why + ([extra] if extra else [])})
+
+    if modelo.available():
+        print("Calculando el pronóstico de 14 días por furni…", flush=True)
+        fc = build_forecast(P, S, O, themes, table, fee, today, first, other_med30, logidx, bt["test_first_t"], keys)
+        summary["forecast"] = fc["report"]
+        (site / "pronostico.json").write_text(json.dumps(
+            {"generated": base["generated"], "horizon_days": HORIZON, "fee_pct": fee * 100,
+             "quantiles": fc["quantiles"], "report": fc["report"], "items": fc["items"]},
+            ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        print(f"Pronóstico: {len(fc['items']):,} furnis.")
+
+    result = {**base, **summary, "picks": picks, "seasons": calendar, "market": market}
     out_path.write_text(json.dumps(result, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"Listo: {len(picks)} recomendaciones.")
     return 0

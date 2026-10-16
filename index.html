@@ -362,6 +362,32 @@
   .alert-card h3 { margin: 0 0 4px; font-size: 16px; }
   .alert-card p { margin: 0; color: var(--muted); font-size: 14px; }
 
+  /* Índice del mercado */
+  .market-index { margin-bottom: 28px; }
+  .index-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 5px 10px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); font-size: 12.5px; color: var(--muted); }
+  .chip b { font-family: var(--mono); font-weight: 600; }
+  .chip.up b { color: var(--green); }
+  .chip.down b { color: var(--red); }
+  .index-chart { position: relative; height: 170px; padding: 8px 12px 4px; }
+  .index-chart svg { display: block; width: 100%; height: 100%; overflow: visible; cursor: crosshair; touch-action: pan-y; }
+  .index-note { padding: 0 20px 14px; margin: 0; font-size: 12.5px; color: var(--muted); }
+
+  /* Pronóstico en el detalle */
+  .forecast-box { margin-bottom: 20px; }
+  .forecast-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 4px; }
+  .forecast-grid .k { display: block; font-size: 12px; color: var(--muted); }
+  .forecast-grid .v { display: block; font-family: var(--mono); font-size: 18px; font-weight: 600; }
+  .prob-bar { height: 6px; border-radius: 99px; background: var(--surface-3); overflow: hidden; margin-top: 6px; }
+  .prob-bar span { display: block; height: 100%; border-radius: 99px; }
+  .fine { font-size: 12.5px; color: var(--muted); margin: 12px 0 0; }
+
+  /* Comparación de modelos del radar */
+  .models-table td, .models-table th { padding: 10px 16px; }
+  .models-table tbody tr { cursor: default; }
+  .models-table tbody tr:hover { background: transparent; }
+  .badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; background: var(--accent); color: var(--accent-ink); vertical-align: 1px; }
+
   .empty { padding: 48px 24px; text-align: center; color: var(--muted); }
   .empty strong { display: block; color: var(--text); font-size: 16px; margin-bottom: 6px; }
   .hidden { display: none !important; }
@@ -377,6 +403,8 @@
     .col-wide { display: none; }
   }
   @media (max-width: 767px) {
+    .forecast-grid { grid-template-columns: 1fr 1fr; }
+    .forecast-grid > :last-child { grid-column: 1 / -1; }
     body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
     /* la barra lateral pasa a ser una barra inferior */
     .sidebar {
@@ -504,6 +532,15 @@
         </div>
       </div>
 
+      <div class="data-section market-index" id="market-index" hidden>
+        <div class="section-header">
+          <h2>Índice del mercado</h2>
+          <div class="index-chips" id="index-chips"></div>
+        </div>
+        <div class="index-chart" id="index-chart"></div>
+        <p class="index-note">Precio del furni típico contra su propio nivel de los últimos dos años (base 100). Pasa el mouse para ver cada día.</p>
+      </div>
+
       <div class="data-section">
         <div class="section-header">
           <h2>Resumen del mercado</h2>
@@ -540,6 +577,7 @@
         <p>Furnis cuyas señales solían venir antes de una subida. Se prueba contra el último año y solo recomienda si le gana al mercado con claridad.</p>
       </div>
       <div id="radar" class="radar-grid"></div>
+      <div class="data-section" id="radar-models" style="margin-top:24px" hidden></div>
     </section>
 
     <!-- En vivo -->
@@ -645,6 +683,8 @@
       <canvas id="chart" role="img" aria-label="Gráfica del precio medio por día"></canvas>
       <div id="chart-tip" class="chart-tip" hidden></div>
     </div>
+
+    <div id="forecast-box" class="stat-card forecast-box" hidden></div>
 
     <div id="radar-box" class="stat-card radar-box" hidden>
       <span class="label">Radar</span>
@@ -819,8 +859,32 @@
     return { expected: p.expected, why: p.why };
   }
 
+  const MODEL_NAMES = { lineal: "Señales lineales", xgboost: "XGBoost", mezcla: "Mezcla de ambos" };
+  function renderModels() {
+    const pr = prediction || {}, box = $("radar-models");
+    if (!pr.models) { box.hidden = true; return; }
+    const rows = Object.entries(pr.models).map(([name, m]) => `<tr>
+        <td>${esc(MODEL_NAMES[name] || name)}${name === pr.model ? '<span class="badge">en uso</span>' : ""}</td>
+        <td class="r num" style="color:${m.picks_ret >= 0 ? "var(--green)" : "var(--red)"}">${pct1(m.picks_ret)}</td>
+        <td class="r num col-hide-sm">${pct1(m.excess)}</td>
+        <td class="r num">${Math.round(m.beat_share * 100)}%</td>
+        <td class="r num col-hide-sm">${Math.round(m.hit_rate * 100)}%</td>
+        <td class="r num col-hide-sm">${m.t_stat.toFixed(1)}</td>
+      </tr>`).join("");
+    box.innerHTML = `<div class="section-header"><h2>Cómo le fue a cada modelo</h2></div>
+      <div class="table-scroll"><table class="market-table models-table">
+        <thead><tr><th scope="col">Modelo</th><th scope="col" class="r">Ganancia</th><th scope="col" class="r col-hide-sm">vs mercado</th>
+          <th scope="col" class="r">Semanas que gana</th><th scope="col" class="r col-hide-sm">Aciertos</th><th scope="col" class="r col-hide-sm">Confianza (t)</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>
+      <p class="index-note" style="padding-top:12px">Prueba de ${pr.test_weeks} semanas (${esc(pr.test_from || "")} a ${esc(pr.test_to || "")}) sin mirar el futuro:
+        cada semana se compran los ${pr.top_n} mejores en los 3 días siguientes y se venden ${pr.horizon_days} días después, ya con ${pr.fee_pct}% de comisión.
+        El mercado hizo ${pct1(pr.market_ret)} en el mismo tiempo. Otro modelo reemplaza a las señales lineales solo si les gana en las dos mitades de la prueba.</p>`;
+    box.hidden = false;
+  }
+
   async function renderRadar() {
     await loadPrediction();
+    renderModels();
     const picks = (prediction.picks || []).map(p => {
       const s = all.find(x => x.key === p.k);
       return s ? { ...s, ...p } : null;
@@ -830,9 +894,9 @@
     if (!picks.length) {
       const pr = prediction || {};
       const detail = pr.test_weeks
-        ? `Última prueba (${pr.test_weeks} semanas): señales ${pct1(pr.picks_ret)} vs mercado ${pct1(pr.market_ret)} a ${pr.horizon_days} días, ` +
-          `le ganan al mercado ${Math.round((pr.beat_share || 0) * 100)}% de las semanas y aciertan ${Math.round((pr.hit_rate || 0) * 100)}%. ` +
-          `Solo se publican recomendaciones cuando le ganan al mercado con claridad.`
+        ? `El modelo en uso (${esc(MODEL_NAMES[pr.model] || "señales lineales")}) hizo ${pct1(pr.picks_ret)} contra ${pct1(pr.market_ret)} del mercado a ${pr.horizon_days} días ` +
+          `y acertó ${Math.round((pr.hit_rate || 0) * 100)}% de sus compras. Solo se publican recomendaciones cuando además dejan ganancia ` +
+          `(más de 1 punto arriba del mercado, más de la mitad de aciertos y le gana al menos 60% de las semanas).`
         : (pr.reason || "El radar necesita más datos históricos para generar predicciones confiables.");
       $("radar").innerHTML = `<div class="empty"><strong>Sin recomendaciones por ahora</strong>${detail}</div>`;
       return;
@@ -906,6 +970,55 @@
       }).join("")}</tbody></table></div>`;
   }
 
+  // ---- Pronóstico de 14 días (pronostico.json, lo calcula prediccion.py) ----
+  let forecast = null;
+  async function loadForecast() {
+    if (forecast) return forecast;
+    try {
+      const r = await fetch("pronostico.json");
+      forecast = r.ok ? await r.json() : { items: {} };
+    } catch (e) { forecast = { items: {} }; }
+    return forecast;
+  }
+  const forecastFor = (s) => (forecast && s && forecast.items && forecast.items[s.key]) || null;
+
+  // Probabilidad de que el precio en 14 días, ya con comisión, supere lo que pagas hoy. Interpola entre los
+  // percentiles en escala logarítmica, igual que prediccion.py al medir qué tan bien calibrado salió.
+  function probProfit(q, price, feePct) {
+    const levels = forecast.quantiles || [0.1, 0.25, 0.5, 0.75, 0.9];
+    const th = Math.log(price / (1 - feePct / 100)), lq = q.map(Math.log);
+    if (th <= lq[0]) return 0.95;
+    if (th >= lq[lq.length - 1]) return 0.05;
+    for (let i = 0; i < lq.length - 1; i++) {
+      if (th <= lq[i + 1]) return 1 - (levels[i] + (levels[i + 1] - levels[i]) * (th - lq[i]) / ((lq[i + 1] - lq[i]) || 1));
+    }
+    return 0.05;
+  }
+
+  function renderForecast(s) {
+    const box = $("forecast-box"), q = forecastFor(s);
+    if (!q) {
+      box.hidden = !forecast;
+      box.innerHTML = `<span class="label">Pronóstico a 14 días</span><p class="fine" style="margin-top:4px">Sin pronóstico: solo se calcula para furnis que se venden al menos 10 veces al mes.</p>`;
+      return;
+    }
+    const fee = Number(index.fee_pct ?? forecast.fee_pct ?? 1);
+    const price = s.price || q[2];
+    const p = probProfit(q, price, fee);
+    const color = p >= 0.6 ? "var(--green)" : p <= 0.4 ? "var(--red)" : "var(--accent)";
+    const rep = forecast.report;
+    box.innerHTML = `<span class="label">Pronóstico a ${forecast.horizon_days || 14} días</span>
+      <div class="forecast-grid">
+        <div><span class="k">Lo más probable</span><span class="v">${fmt(q[2])}</span></div>
+        <div><span class="k">Rango probable (80%)</span><span class="v">${fmt(q[0])}–${fmt(q[4])}</span></div>
+        <div><span class="k">Probabilidad de ganar comprando a ${fmt(price)}</span><span class="v" style="color:${color}">${Math.round(p * 100)}%</span>
+          <div class="prob-bar" aria-hidden="true"><span style="width:${Math.round(p * 100)}%;background:${color}"></span></div></div>
+      </div>
+      <p class="fine">Ya con ${fee}% de comisión. Modelo XGBoost por cuantiles${rep ? `: en semanas que no vio, el precio real cayó dentro del rango ${Math.round(rep.coverage80 * 100)}% de las veces` : ""}.
+        Es una estimación, no una garantía.</p>`;
+    box.hidden = false;
+  }
+
   // ---- Detail & Chart ----
   let currentHistory = null, chartState = null, hoverIdx = null;
   const DAY = 86400000;
@@ -946,9 +1059,13 @@
     }
 
     const dated = data[0].t != null;
+    // el pronóstico se dibuja a la derecha, 14 días después del último dato (no en el rango de 7 días: lo aplastaría)
+    const fq = dated && rangeDays !== 7 ? forecastFor(current) : null;
+    const fcT = fq ? data[data.length - 1].t + (forecast.horizon_days || 14) * DAY : null;
     const prices = data.map((x) => x.avg);
     data.forEach((d) => { if (d.low) prices.push(d.low); });
     if (current.fair) prices.push(current.fair);
+    if (fq) prices.push(fq[0], fq[4]);
     let minP = Math.min(...prices), maxP = Math.max(...prices);
     const pad = (maxP - minP) * 0.08 || maxP * 0.05 || 1;
     minP = Math.max(0, minP - pad); maxP += pad;
@@ -956,7 +1073,7 @@
     const margin = { top: 24, right: 16, bottom: 36, left: 52 };
     const chartW = w - margin.left - margin.right;
     const chartH = h - margin.top - margin.bottom;
-    const t0 = dated ? data[0].t : 0, t1 = dated ? data[data.length - 1].t : data.length - 1;
+    const t0 = dated ? data[0].t : 0, t1 = fcT || (dated ? data[data.length - 1].t : data.length - 1);
     const getX = (d) => margin.left + (((dated ? d.t : d.i) - t0) / (t1 - t0 || 1)) * chartW;
     const getY = (p) => margin.top + chartH - ((p - minP) / (maxP - minP)) * chartH;
 
@@ -975,7 +1092,7 @@
     // Fechas: marcas repartidas por tiempo, no por número de puntos
     ctx.textAlign = "center";
     ctx.fillStyle = "#94a3b8";
-    const ticks = Math.max(2, Math.min(6, Math.floor(chartW / 80)));
+    const ticks = Math.max(2, Math.min(5, Math.floor(chartW / 90)));
     const span = t1 - t0;
     for (let k = 0; k <= ticks; k++) {
       const v = t0 + (span * k) / ticks, x = margin.left + (chartW * k) / ticks;
@@ -1022,6 +1139,23 @@
     pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
     ctx.stroke();
 
+    // Pronóstico: abanico desde el último precio hasta el rango a 14 días
+    if (fq) {
+      const [lx0, ly0] = pts[pts.length - 1], fx = getX({ t: fcT });
+      const fan = (lo, hi, color) => {
+        ctx.beginPath(); ctx.moveTo(lx0, ly0); ctx.lineTo(fx, getY(hi)); ctx.lineTo(fx, getY(lo)); ctx.closePath();
+        ctx.fillStyle = color; ctx.fill();
+      };
+      fan(fq[0], fq[4], "rgba(245, 184, 61, 0.10)");
+      fan(fq[1], fq[3], "rgba(245, 184, 61, 0.18)");
+      ctx.save();
+      ctx.setLineDash([5, 4]); ctx.strokeStyle = "#f5b83d"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(lx0, ly0); ctx.lineTo(fx, getY(fq[2])); ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = "#f5b83d";
+      ctx.beginPath(); ctx.arc(fx, getY(fq[2]), 3, 0, Math.PI * 2); ctx.fill();
+    }
+
     // Precio más bajo visto ese día
     ctx.fillStyle = "#34d399";
     data.forEach((d) => {
@@ -1032,10 +1166,12 @@
     ctx.textAlign = "left"; ctx.font = "12px 'Fira Sans', sans-serif";
     let lx = margin.left;
     const legend = (color, text) => { ctx.fillStyle = color; ctx.fillText(text, lx, 12); lx += ctx.measureText(text).width + 14; };
-    legend("#f5b83d", "● Precio medio");
-    if (data.some((x) => x.low)) legend("#34d399", "● Más baja");
-    if (current.fair) legend("#94a3b8", "┄ Precio justo");
+    const narrow = w < 520;   // en celular, etiquetas cortas para que quepan
+    legend("#f5b83d", narrow ? "● Medio" : "● Precio medio");
+    if (data.some((x) => x.low)) legend("#34d399", narrow ? "● Baja" : "● Más baja");
+    if (current.fair) legend("#94a3b8", narrow ? "┄ Justo" : "┄ Precio justo");
     if (maxO) legend("#64748b", "▮ Ofertas");
+    if (fq) legend("rgba(245,184,61,0.8)", narrow ? "◢ 14 d" : "◢ Pronóstico 14 d");
 
     chartState = { data, pts, margin, chartH, w, h, getY };
     if (hoverIdx != null && hoverIdx < data.length) drawHover(ctx, hoverIdx);
@@ -1114,7 +1250,7 @@
     let html = `<div class="stats-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 24px;">`;
     if (s.price && s.fair) {
       const fee = index.fee_pct || 1;
-      const net = Math.round(s.fair * (1 - fee/100) - s.price);
+      const net = Math.round(s.fair * (1 - fee/100) - s.price) || 0;   // || 0: sin "-0"
       const roi = Math.round((net / s.price) * 100);
       html += `<div class="stat-card"><span class="label">Ganancia si revendes al justo (con comisión)</span><span class="value ${net > 0 ? 'up' : 'down'}">${net > 0 ? '+' : ''}${fmt(net)} (${roi}%)</span></div>`;
     }
@@ -1141,6 +1277,8 @@
     currentHistory = null;   // si no, se veía el historial del furni anterior mientras carga el nuevo
     hoverIdx = null;
     drawChart();
+    $("forecast-box").hidden = true;
+    loadForecast().then(() => { if (current === s) { renderForecast(s); drawChart(); } });
 
     // Historial largo
     try {
@@ -1157,12 +1295,68 @@
     await loadPrediction();
     const pk = radarPick(s.key);
     if (pk) {
-      radar.querySelector("strong").textContent = `Proyección AI: ${pct1(pk.expected)} en ${prediction.horizon_days} días`;
+      radar.querySelector("strong").textContent = `Subida estimada: ${pct1(pk.expected)} en ${prediction.horizon_days} días`;
       radar.querySelector("ul").innerHTML = pk.why.map((w) => `<li>${esc(w)}</li>`).join("");
       radar.hidden = false;
     }
   }
   window.addEventListener("hashchange", () => { openedInPage = !!location.hash.slice(1); route(); });
+
+  // ---- Índice del mercado (prediccion.json → market) ----
+  function renderMarketIndex() {
+    const m = prediction && prediction.market;
+    const box = $("market-index");
+    if (!m || !m.values || m.values.length < 2) { box.hidden = true; return; }
+    box.hidden = false;
+    const chip = (label, v) => `<span class="chip ${v > 0.002 ? "up" : v < -0.002 ? "down" : ""}">${label} <b>${pct1(v)}</b></span>`;
+    $("index-chips").innerHTML = chip("7 días", m.change7) + chip("30 días", m.change30) + chip("90 días", m.change90) +
+      (m.breadth != null ? `<span class="chip" title="Furnis arriba de su mediana del último mes">Subiendo <b>${Math.round(m.breadth * 100)}%</b></span>` : "");
+    drawMarketIndex();
+  }
+
+  function drawMarketIndex() {
+    const m = prediction && prediction.market, el = $("index-chart");
+    if (!m || !m.values || el.offsetParent === null) return;
+    const W = Math.max(280, el.clientWidth - 24), H = el.clientHeight - 12;
+    const v = m.values, n = v.length, t0 = Date.parse(m.from + "T00:00:00Z");
+    const pad = { l: 36, r: 8, t: 8, b: 20 };
+    const lo = Math.min(...v), hi = Math.max(...v), span = (hi - lo) || 1;
+    const x = (i) => pad.l + (i / (n - 1)) * (W - pad.l - pad.r);
+    const y = (val) => pad.t + (1 - (val - lo) / span) * (H - pad.t - pad.b);
+    const path = v.map((val, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(val).toFixed(1)}`).join("");
+    const area = `${path}L${x(n - 1).toFixed(1)},${H - pad.b}L${x(0).toFixed(1)},${H - pad.b}Z`;
+    const ticks = [lo, (lo + hi) / 2, hi].map((val) =>
+      `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y(val)}" y2="${y(val)}" stroke="#1a2436"/>
+       <text x="${pad.l - 6}" y="${y(val) + 3}" text-anchor="end" fill="#94a3b8" font-size="10" font-family="Fira Code, monospace">${Math.round(val)}</text>`).join("");
+    const dates = [0, Math.floor((n - 1) / 2), n - 1].map((i, k) =>
+      `<text x="${x(i)}" y="${H - 4}" text-anchor="${["start", "middle", "end"][k]}" fill="#94a3b8" font-size="10" font-family="Fira Code, monospace">${
+        new Date(t0 + i * DAY).toLocaleDateString("es-MX", { month: "short", year: "2-digit", timeZone: "UTC" })}</text>`).join("");
+    const base = 100 >= lo && 100 <= hi ? `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y(100)}" y2="${y(100)}" stroke="#94a3b8" stroke-dasharray="3 4" opacity=".6"/>` : "";
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Índice del mercado: ${pct1(m.change90)} en 90 días">
+      <defs><linearGradient id="ix-g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#f5b83d" stop-opacity=".22"/><stop offset="1" stop-color="#f5b83d" stop-opacity="0"/></linearGradient></defs>
+      ${ticks}${base}<path d="${area}" fill="url(#ix-g)"/><path d="${path}" fill="none" stroke="#f5b83d" stroke-width="1.8" stroke-linejoin="round"/>
+      ${dates}<line id="ix-cross" y1="${pad.t}" y2="${H - pad.b}" stroke="rgba(232,236,243,.3)" visibility="hidden"/>
+      <circle id="ix-dot" r="4" fill="#f5b83d" stroke="#070b14" stroke-width="2" visibility="hidden"/></svg>
+      <div id="ix-tip" class="chart-tip" hidden></div>`;
+    const svg = el.querySelector("svg"), cross = el.querySelector("#ix-cross"), dot = el.querySelector("#ix-dot"), tip = el.querySelector("#ix-tip");
+    const move = (ev) => {
+      const r = svg.getBoundingClientRect();
+      const px = (ev.clientX - r.left) * (W / r.width);
+      const i = Math.max(0, Math.min(n - 1, Math.round((px - pad.l) / (W - pad.l - pad.r) * (n - 1))));
+      cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("visibility", "visible");
+      dot.setAttribute("cx", x(i)); dot.setAttribute("cy", y(v[i])); dot.setAttribute("visibility", "visible");
+      tip.innerHTML = `<b>${fmtDate(t0 + i * DAY)}</b><br>Índice <span class="num">${v[i].toFixed(1)}</span>` +
+        (i >= 30 ? `<br><span style="color:var(--muted)">30 días: ${pct1(v[i] / v[i - 30] - 1)}</span>` : "");
+      tip.hidden = false;
+      const left = x(i) * (r.width / W) + 12;
+      tip.style.left = `${left + tip.offsetWidth > r.width ? left - 24 - tip.offsetWidth : left}px`;
+      tip.style.top = "8px";
+    };
+    svg.addEventListener("pointermove", move);
+    svg.addEventListener("pointerdown", move);
+    svg.addEventListener("pointerleave", () => { tip.hidden = true; cross.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); });
+  }
+  new ResizeObserver(() => drawMarketIndex()).observe($("index-chart"));
 
   // ---- Tarjetas de estado (todo sale de los datos, nada fijo) ----
   const STALE_INDEX = 14 * 3600000;   // el recolector corre cada 12 h
@@ -1288,7 +1482,7 @@
       $("market-title").textContent = `Analizando el mercado de ${index.hotel.toUpperCase()}, ${fmt(all.length)} furnis rastreados`;
       
       renderStats();
-      loadPrediction().then(renderStats);
+      loadPrediction().then(() => { renderStats(); renderMarketIndex(); });
       
       // Hotel switch
       const switchEl = $("hotel-switch");
