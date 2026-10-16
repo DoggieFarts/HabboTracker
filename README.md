@@ -4,11 +4,11 @@ Rastreador público de precios del Mercadillo de Habbo (por ejemplo `habbo.es` y
 
 ## Qué tiene
 
-- **Mercado:** todos los furnis con ventas, con su precio justo (mediana de 30 días), rango normal y días para revender. Buscador de los ~18,000 furnis de cada hotel.
+- **Mercado:** todos los furnis con ventas, con su precio justo (mediana de 30 días), rango normal, minigráfica de 30 días y días para revender. Buscador de los ~18,000 furnis de cada hotel.
 - **Lanzamientos:** furnis nuevos de los últimos 30 días y cuánto han bajado desde su máximo.
 - **Presupuesto:** arma una lista de compras según tus créditos y en cuánto quieres revender.
 - **Radar:** furnis cuyas señales (menos ofertas, más ventas, tendencia, caídas que se corrigen) solían venir antes de una subida. Se prueba en cada actualización contra el último año, sin mirar el futuro, y solo recomienda si le gana al mercado con claridad.
-- **Historial de 2 años** por furni, traído de habboapi.site.
+- **Historial de 2 años** por furni, traído de habboapi.site. La gráfica muestra los datos de cada día al pasar el mouse y tiene rangos de 7 días a todo el historial.
 
 ## Archivos
 
@@ -21,7 +21,6 @@ Rastreador público de precios del Mercadillo de Habbo (por ejemplo `habbo.es` y
 | `publicar.sh` | Publica los datos en la rama `datos`, que es la que muestra Pages. |
 | `avisos.json` | Configuración: hoteles, comisión del Mercadillo y dirección de los precios en vivo. |
 | `en_vivo.py` | Corre sin parar en una máquina virtual de Azure y mantiene los precios en vivo. |
-| `azure-cloud-init.yml` | Configuración que se pega al crear la máquina de Azure; la deja instalada sola. |
 | `.github/workflows/recolectar.yml` | Corre el recolector a las 7 a. m. y 7 p. m. (hora del centro de México). |
 | `.github/workflows/historial-completo.yml` | Carga inicial del historial, a mano y una sola vez. |
 
@@ -41,13 +40,15 @@ La página siempre sigue visible con la última versión publicada mientras una 
 Una máquina virtual B1s de Azure (incluida en Azure for Students) puede correr una instancia de `en_vivo.py` por hotel todo el tiempo:
 
 - Toma la lista de furnis de `indice.json` en la página publicada del hotel correspondiente.
-- Refresca los 500 más vendidos cada par de minutos y rota el resto del mercado.
-- Escribe `vivo-<hotel>.json`, que Caddy entrega por HTTPS con certificado automático.
+- Refresca los 500 más vendidos lo más rápido que Habbo permite y rota el resto del mercado. Empieza con una consulta cada 3 s y acelera sola mientras Habbo no se queje (hasta `PAUSA_MIN`, 1 s por defecto); si Habbo responde 429, frena y no vuelve a ese ritmo durante una hora.
+- Escribe `vivo-<hotel>.json` cada 10 segundos, que Caddy entrega por HTTPS con certificado automático.
 
-La página lo consulta cada 2 minutos (solo con la pestaña visible) cuando `en_vivo_url` está en `avisos.json`. Si la máquina no responde, la página sigue con los datos publicados por GitHub.
+La página lo consulta cada 15 segundos (solo con la pestaña visible; si el archivo no cambió, el navegador no lo vuelve a descargar) cuando `en_vivo_url` está en `avisos.json`. Si la máquina no responde, la página sigue con los datos publicados por GitHub.
 
 La máquina baja la versión más reciente de `en_vivo.py` desde el repo cada día a las 10:00 UTC, así que para actualizarla basta con cambiar el archivo en GitHub.
 
 ## Alertas
 
 Las alertas por Telegram están desactivadas por ahora. Mientras `telegram_bot` esté vacío en `avisos.json`, la página no muestra nada relacionado con alertas.
+
+La tarjeta **Precios en Vivo** del panel muestra cuántos precios hay, qué tan recientes son y cada cuántos segundos se refrescan los más vendidos.
