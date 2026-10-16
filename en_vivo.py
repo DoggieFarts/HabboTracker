@@ -7,6 +7,10 @@ Mercadillo lo más frescos que Habbo permite.
   * Busca solo el ritmo más rápido que Habbo tolera: acelera mientras no haya quejas y frena
     en cuanto pide ir más despacio (error 429), sin volver a bajar de ese ritmo durante una hora.
   * Cada 10 segundos escribe vivo.json, que un servidor web (Caddy) entrega por HTTPS.
+  * Guarda cada lectura en disco (un archivo .csv.gz por día) para entrenar más adelante un modelo de
+    reventa el mismo día. Ocupa unos pocos MB por día; borra los archivos más viejos que GUARDAR_DIAS.
+  * Si hay un bot de Telegram configurado, avisa en un canal cuando aparece una ganga: un furni que se
+    vende seguido, publicado muy por debajo de su precio justo, que se puede revender rápido con ganancia.
 
 Solo usa la biblioteca estándar de Python. La configuración viene de /etc/mercadillo.env:
   SITE_URL   dirección de la página, por ejemplo https://usuario.github.io/mercadillo-habbo
@@ -14,10 +18,15 @@ Solo usa la biblioteca estándar de Python. La configuración viene de /etc/merc
   SALIDA     archivo a escribir (por defecto /var/lib/mercadillo/vivo[-hotel].json)
   TOP        cuántos de los más vendidos se refrescan seguido (por defecto 500)
   PAUSA_MIN  segundos mínimos entre consultas a Habbo (por defecto 1)
+  HISTORIAL  carpeta donde guardar cada lectura (por defecto /var/lib/mercadillo/historial[-hotel])
+  GUARDAR_DIAS  cuántos días de lecturas conservar (por defecto 120)
+  TELEGRAM_TOKEN  token del bot (de @BotFather); sin él no se mandan avisos
+  TELEGRAM_CANAL  canal donde avisar, por ejemplo @habbomarket_gangas (el bot debe ser administrador)
 """
 
 from __future__ import annotations
 
+import gzip
 import json
 import os
 import signal
@@ -48,6 +57,12 @@ FLOOR_HOURS = 1.0          # cuánto se respeta el ritmo que provocó el último
 INDEX_EVERY = 30 * 60      # recargar la lista de furnis cada media hora
 WRITE_EVERY = 10           # escribir vivo.json cada 10 segundos
 KEEP_SECONDS = 3 * 3600    # en vivo.json solo van precios de las últimas 3 horas
+HIST_DIR = Path(os.environ.get("HISTORIAL", f"/var/lib/mercadillo/historial-{HOTEL_ENV}" if HOTEL_ENV else "/var/lib/mercadillo/historial"))
+KEEP_DAYS = int(os.environ.get("GUARDAR_DIAS", "120"))
+TG_TOKEN = os.environ.get("TELEGRAM_TOKEN", "").strip()
+TG_CHAT = os.environ.get("TELEGRAM_CANAL", "").strip()
+ALERT_AGAIN = 6 * 3600     # no repetir el aviso del mismo furni antes de 6 horas, salvo que baje más
+ALERT_MAX_HOUR = 20        # tope de avisos por hora, para no saturar el canal
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
               "Chrome/130.0 Safari/537.36 Mercadillo-en-vivo/1.0")
 
@@ -102,6 +117,11 @@ class Live:
         self.top_started = time.time()
         self.top_cycle = None
         self.limited = 0
+        self.meta: dict[str, dict] = {}     # clave -> nombre, precio justo, ventas del mes (de indice.json)
+        self.fee = 0.01
+        self.rules = {"descuento_pct": 15, "ganancia": 20, "dias": 1, "ventas_dia": 2}
+        self.alerted: dict[str, tuple[float, int]] = {}   # clave -> (cuándo, a qué precio) se avisó
+        self.alert_times: list[float] = []
         self.load_previous()
 
     def load_previous(self) -> None:
@@ -124,6 +144,10 @@ class Live:
             return
         self.hotel = index.get("hotel", self.hotel)
         items = index.get("items", {})
+        self.meta = {k: {"n": v.get("n") or k, "m": v.get("m"), "s": v.get("s") or 0, "f": v.get("f"), "mw": v.get("mw")}
+                     for k, v in items.items()}
+        self.fee = float(index.get("fee_pct", 1)) / 100
+        self.rules.update(index.get("gangas") or {})
         ranked = sorted((k for k, v in items.items() if v.get("s")), key=lambda k: -(items[k].get("s") or 0))
         self.top, self.rest = ranked[:TOP], ranked[TOP:]
         self.i_top %= max(1, len(self.top))
@@ -172,6 +196,7 @@ class Live:
             self.sleep(30)
             return
         now = int(time.time())
+        rows = []
         for kind, field in (("room", "roomItemData"), ("wall", "wallItemData")):
             for d in data.get(field) or []:
                 try:
@@ -179,12 +204,84 @@ class Live:
                     offers = int(d["currentOpenOffers"]) if d.get("currentOpenOffers") is not None else None
                 except (TypeError, ValueError):
                     continue
-                self.prices[f"{kind}:{d.get('item')}"] = [price, offers, now]
+                key = f"{kind}:{d.get('item')}"
+                self.prices[key] = [price, offers, now]
+                rows.append(f"{now},{key},{price or ''},{'' if offers is None else offers}\n")
+                self.check_deal(key, price, offers)
+        self.save_rows(rows)
         self.calm += 1
         if self.floor > MIN_PAUSE and time.time() > self.floor_until:
             self.floor = MIN_PAUSE                       # pasó la hora: se vuelve a probar más rápido
         if self.calm >= CALM_TO_SPEED_UP and self.pause > self.floor:  # sin quejas: se acelera un poco
             self.pause, self.calm = max(self.floor, self.pause * 0.9), 0
+
+    # ---- lecturas guardadas (para el modelo de reventa del mismo día) ----
+    def save_rows(self, rows: list[str]) -> None:
+        if not rows:
+            return
+        try:
+            HIST_DIR.mkdir(parents=True, exist_ok=True)
+            day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            path = HIST_DIR / f"{day}.csv.gz"
+            new = not path.exists()
+            # gzip en modo "a" agrega un bloque nuevo; cualquier lector de gzip lee todos los bloques seguidos
+            with gzip.open(path, "at", encoding="utf-8") as f:
+                if new:
+                    f.write("t,clave,precio,ofertas\n")
+                    self.prune_history()
+                f.writelines(rows)
+        except OSError as e:
+            log(f"No se pudo guardar el historial ({e}).")
+
+    def prune_history(self) -> None:
+        cutoff = time.time() - KEEP_DAYS * 86400
+        for f in HIST_DIR.glob("*.csv.gz"):
+            if f.stat().st_mtime < cutoff:
+                f.unlink(missing_ok=True)
+
+    # ---- avisos de gangas en Telegram ----
+    def deal(self, key: str, price: int | None, offers: int | None) -> dict | None:
+        """La misma regla que la pestaña Gangas de la página, con los valores de inicio de avisos.json."""
+        m = self.meta.get(key)
+        if not m or not price or not m["m"] or m["mw"] or m["f"]:
+            return None                     # sin precio justo del mes, o recién lanzado: no hay con qué comparar
+        per_day = m["s"] / 30
+        if per_day < float(self.rules["ventas_dia"]):
+            return None
+        profit = m["m"] * (1 - self.fee) - price
+        disc = 1 - price / m["m"]
+        days = (offers or 0) / per_day
+        if disc * 100 < float(self.rules["descuento_pct"]) or profit < float(self.rules["ganancia"]) or days > float(self.rules["dias"]):
+            return None
+        return {"profit": int(profit), "disc": disc, "days": days, "fair": m["m"], "name": m["n"]}
+
+    def check_deal(self, key: str, price: int | None, offers: int | None) -> None:
+        if not (TG_TOKEN and TG_CHAT):
+            return
+        d = self.deal(key, price, offers)
+        if not d:
+            return
+        now = time.time()
+        last = self.alerted.get(key)
+        if last and now - last[0] < ALERT_AGAIN and price >= last[1]:
+            return
+        self.alert_times = [t for t in self.alert_times if now - t < 3600]
+        if len(self.alert_times) >= ALERT_MAX_HOUR:
+            return
+        site = SITE_URL + "/"
+        text = (f"🟢 Ganga en {self.hotel}: {d['name']}\n"
+                f"Cómpralo a {price:,} (precio justo {d['fair']:,}, {round(d['disc'] * 100)}% abajo)\n"
+                f"Ganancia estimada al revender: +{d['profit']:,} créditos ya con comisión\n"
+                f"Se vende en ~{max(d['days'], 0.1):.1f} días al ritmo actual\n"
+                f"{site}#{key}\n"
+                f"Precio leído hace segundos; puede que ya no esté.")
+        try:
+            http_json(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
+                      {"chat_id": TG_CHAT, "text": text, "disable_web_page_preview": True}, timeout=15)
+            self.alerted[key] = (now, price)
+            self.alert_times.append(now)
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
+            log(f"No se pudo avisar en Telegram ({e}).")
 
     def write(self) -> None:
         now = int(time.time())
@@ -208,7 +305,8 @@ class Live:
         if not SITE_URL:
             log("Falta SITE_URL en /etc/mercadillo.env.")
             sys.exit(1)
-        log(f"Iniciando con la página {SITE_URL}.")
+        log(f"Iniciando con la página {SITE_URL}. Lecturas en {HIST_DIR}. "
+            f"Avisos de Telegram: {'en ' + TG_CHAT if TG_TOKEN and TG_CHAT else 'apagados'}.")
         last_report = time.time()
         while running:
             if time.time() - self.index_at > INDEX_EVERY:

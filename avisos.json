@@ -12,6 +12,8 @@
   "vigia": {
     "descuento_minimo_pct": 15,
     "ganancia_minima": 20,
+    "dias_max_venta": 1,
+    "ventas_min_dia": 2,
     "furnis": 200
   },
   "avisos": []
