@@ -488,6 +488,19 @@
     position: relative;
   }
   canvas { width: 100% !important; height: 100% !important; }
+  #chart { cursor: crosshair; touch-action: pan-y; }
+  .chart-tip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(10, 12, 31, 0.95);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
   
   /* Budget & Radar Views */
   .view-content { display: none; }
@@ -775,11 +788,14 @@
         <button class="btn-filter" data-days="7" aria-pressed="true">7d</button>
         <button class="btn-filter" data-days="30">30d</button>
         <button class="btn-filter" data-days="90">90d</button>
+        <button class="btn-filter" data-days="365">1a</button>
+        <button class="btn-filter" data-days="0">Todo</button>
       </div>
     </div>
     
     <div class="chart-container">
       <canvas id="chart"></canvas>
+      <div id="chart-tip" class="chart-tip" hidden></div>
     </div>
 
     <div id="radar-box" class="stat-card" style="background:rgba(124, 58, 237, 0.05); border-color:rgba(124, 58, 237, 0.2);" hidden>
@@ -1029,130 +1045,181 @@
   }
 
   // ---- Detail & Chart ----
-  let currentHistory = null;
+  let currentHistory = null, chartState = null, hoverIdx = null;
+  const DAY = 86400000;
+  const fmtDate = (t) => new Date(t).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+
+  // Puntos del periodo elegido: con fecha si ya llegó el historial, si no la minigráfica de 30 días.
+  function chartData() {
+    if (currentHistory && currentHistory.d) {
+      const rows = Object.entries(currentHistory.d)
+        .map(([date, v]) => ({ t: Date.parse(date + "T00:00:00Z"), avg: v[0], sold: v[1], offers: v[2], low: v[3] }))
+        .filter((x) => x.avg)
+        .sort((a, b) => a.t - b.t);
+      if (!rows.length || !rangeDays) return rows;
+      const from = rows[rows.length - 1].t - (rangeDays - 1) * DAY;
+      return rows.filter((x) => x.t >= from);
+    }
+    const sp = (current.spark || []).filter(Boolean);
+    return sp.slice(-rangeDays || undefined).map((avg, i) => ({ t: null, i, avg }));
+  }
 
   function drawChart() {
     const canvas = $("chart"), ctx = canvas.getContext("2d");
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const w = rect.width, h = rect.height;
+    ctx.clearRect(0, 0, w, h);
+    chartState = null;
+    $("chart-tip").hidden = true;
 
     if (!current) return;
-
-    let history = [];
-    if (currentHistory && currentHistory.d) {
-      history = Object.entries(currentHistory.d)
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([date, vals]) => ({ date, avg: vals[0], sold: vals[1], offers: vals[2], low: vals[3] }));
-    } else {
-      history = (current.spark || []).map((v) => ({ avg: v }));
-    }
-
-    const data = history.slice(-rangeDays).filter(x => x.avg !== null);
+    const data = chartData();
     if (data.length < 2) {
-      ctx.clearRect(0, 0, w, h);
-      ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.textAlign = "center";
-      ctx.fillText("Sin datos suficientes para este periodo", w/2, h/2);
+      ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.textAlign = "center"; ctx.font = "12px Inter, sans-serif";
+      ctx.fillText(currentHistory ? "Sin ventas suficientes en este periodo" : "Cargando historial…", w / 2, h / 2);
       return;
     }
 
-    const prices = data.map(x => x.avg);
-    if (data.some(x => x.low)) data.forEach(d => { if(d.low) prices.push(d.low); });
-    
-    const minP = Math.min(...prices) * 0.98, maxP = Math.max(...prices) * 1.02;
-    const margin = { top: 20, right: 20, bottom: 40, left: 45 };
+    const dated = data[0].t != null;
+    const prices = data.map((x) => x.avg);
+    data.forEach((d) => { if (d.low) prices.push(d.low); });
+    if (current.fair) prices.push(current.fair);
+    let minP = Math.min(...prices), maxP = Math.max(...prices);
+    const pad = (maxP - minP) * 0.08 || maxP * 0.05 || 1;
+    minP = Math.max(0, minP - pad); maxP += pad;
+
+    const margin = { top: 24, right: 16, bottom: 36, left: 52 };
     const chartW = w - margin.left - margin.right;
     const chartH = h - margin.top - margin.bottom;
-
-    const getX = (i) => margin.left + (i / (data.length - 1)) * chartW;
+    const t0 = dated ? data[0].t : 0, t1 = dated ? data[data.length - 1].t : data.length - 1;
+    const getX = (d) => margin.left + (((dated ? d.t : d.i) - t0) / (t1 - t0 || 1)) * chartW;
     const getY = (p) => margin.top + chartH - ((p - minP) / (maxP - minP)) * chartH;
 
-    ctx.clearRect(0, 0, w, h);
-
-    // Grid & Y labels
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
-    ctx.lineWidth = 1;
+    // Rejilla y precios
     ctx.font = "10px Inter, sans-serif";
-    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.lineWidth = 1;
     ctx.textAlign = "right";
-    
-    [0, 0.25, 0.5, 0.75, 1].forEach(f => {
-      const p = minP + f * (maxP - minP);
-      const y = getY(p);
+    [0, 0.25, 0.5, 0.75, 1].forEach((f) => {
+      const p = minP + f * (maxP - minP), y = getY(p);
+      ctx.strokeStyle = "rgba(255,255,255,0.06)";
       ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(w - margin.right, y); ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.45)";
       ctx.fillText(fmt(Math.round(p)), margin.left - 8, y + 3);
     });
 
-    // Legend
-    ctx.textAlign = "left";
-    ctx.fillText("● Precio Medio", margin.left, margin.top - 8);
-    if (data.some(x => x.low)) {
-      ctx.fillStyle = "#10b981"; ctx.fillText("● Gangas", margin.left + 85, margin.top - 8);
-    }
-    if (data.some(x => x.offers)) {
-      ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillText("■ Stock", margin.left + 150, margin.top - 8);
-    }
-
-    // X Labels
+    // Fechas: marcas repartidas por tiempo, no por número de puntos
     ctx.textAlign = "center";
-    const step = Math.max(1, Math.floor(data.length / 6));
-    data.forEach((d, i) => {
-      if (i % step === 0 || i === data.length - 1) {
-        const x = getX(i);
-        if (d.date) {
-           const label = d.date.split("-").slice(1).reverse().join("/");
-           ctx.fillText(label, x, h - 20);
-           if (i === data.length - 1 || i === 0) {
-              ctx.fillText(d.date.split("-")[0], x, h - 8);
-           }
-        }
-      }
-    });
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    const ticks = Math.max(2, Math.min(6, Math.floor(chartW / 80)));
+    const span = t1 - t0;
+    for (let k = 0; k <= ticks; k++) {
+      const v = t0 + (span * k) / ticks, x = margin.left + (chartW * k) / ticks;
+      const label = dated
+        ? new Date(v).toLocaleDateString("es-MX", span > 200 * DAY ? { month: "short", year: "2-digit", timeZone: "UTC" } : { day: "numeric", month: "short", timeZone: "UTC" })
+        : (k === ticks ? "hoy" : "");
+      ctx.fillText(label, x, h - 14);
+    }
 
-    // Stock bars (optional, light)
-    if (data.some(x => x.offers)) {
-      const maxO = Math.max(...data.map(x => x.offers || 0));
-      data.forEach((d, i) => {
-        if (d.offers) {
-          const bw = (chartW / data.length) * 0.5;
-          const bh = (d.offers / maxO) * chartH * 0.3;
-          ctx.fillStyle = "rgba(255,255,255,0.03)";
-          ctx.fillRect(getX(i) - bw/2, margin.top + chartH - bh, bw, bh);
-        }
+    // Ofertas abiertas (barras al fondo)
+    const maxO = Math.max(0, ...data.map((x) => x.offers || 0));
+    if (maxO) {
+      const bw = Math.max(1, Math.min(10, (chartW / data.length) * 0.6));
+      ctx.fillStyle = "rgba(255,255,255,0.08)";
+      data.forEach((d) => {
+        if (!d.offers) return;
+        const bh = (d.offers / maxO) * chartH * 0.3;
+        ctx.fillRect(getX(d) - bw / 2, margin.top + chartH - bh, bw, bh);
       });
     }
 
-    // Price Area
+    // Precio justo (referencia)
+    if (current.fair && current.fair >= minP && current.fair <= maxP) {
+      const y = getY(current.fair);
+      ctx.save();
+      ctx.setLineDash([4, 4]); ctx.strokeStyle = "rgba(251,191,36,0.6)";
+      ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(w - margin.right, y); ctx.stroke();
+      ctx.restore();
+    }
+
+    // Área y línea del precio medio
+    const pts = data.map((d) => [getX(d), getY(d.avg)]);
     ctx.beginPath();
-    data.forEach((d, i) => {
-      const x = getX(i), y = getY(d.avg);
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    });
-    ctx.lineTo(getX(data.length - 1), margin.top + chartH);
-    ctx.lineTo(getX(0), margin.top + chartH);
+    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.lineTo(pts[pts.length - 1][0], margin.top + chartH);
+    ctx.lineTo(pts[0][0], margin.top + chartH);
     const grad = ctx.createLinearGradient(0, margin.top, 0, margin.top + chartH);
-    grad.addColorStop(0, "rgba(124, 58, 237, 0.15)"); grad.addColorStop(1, "transparent");
+    grad.addColorStop(0, "rgba(124, 58, 237, 0.2)"); grad.addColorStop(1, "rgba(124, 58, 237, 0)");
     ctx.fillStyle = grad; ctx.fill();
 
-    // Price Line
     ctx.beginPath();
-    ctx.strokeStyle = "#a78bfa"; ctx.lineWidth = 2.5; ctx.lineJoin = "round";
-    data.forEach((d, i) => {
-      const x = getX(i), y = getY(d.avg);
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    });
+    ctx.strokeStyle = "#a78bfa"; ctx.lineWidth = 2; ctx.lineJoin = "round";
+    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
     ctx.stroke();
 
-    // Low price points
-    data.forEach((d, i) => {
-      if (d.low && d.low < d.avg) {
-        ctx.fillStyle = "#10b981";
-        ctx.beginPath(); ctx.arc(getX(i), getY(d.low), 2, 0, Math.PI*2); ctx.fill();
-      }
+    // Precio más bajo visto ese día
+    ctx.fillStyle = "#10b981";
+    data.forEach((d) => {
+      if (d.low) { ctx.beginPath(); ctx.arc(getX(d), getY(d.low), 2.5, 0, Math.PI * 2); ctx.fill(); }
     });
+
+    // Leyenda
+    ctx.textAlign = "left"; ctx.font = "11px Inter, sans-serif";
+    let lx = margin.left;
+    const legend = (color, text) => { ctx.fillStyle = color; ctx.fillText(text, lx, 12); lx += ctx.measureText(text).width + 14; };
+    legend("#a78bfa", "● Precio medio");
+    if (data.some((x) => x.low)) legend("#10b981", "● Más baja");
+    if (current.fair) legend("rgba(251,191,36,0.9)", "┄ Precio justo");
+    if (maxO) legend("rgba(255,255,255,0.5)", "▮ Ofertas");
+
+    chartState = { data, pts, margin, chartH, w, h, getY };
+    if (hoverIdx != null && hoverIdx < data.length) drawHover(ctx, hoverIdx);
   }
+
+  function drawHover(ctx, i) {
+    const { data, pts, margin, chartH, w } = chartState;
+    const d = data[i], [x, y] = pts[i];
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,255,255,0.25)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, margin.top); ctx.lineTo(x, margin.top + chartH); ctx.stroke();
+    ctx.fillStyle = "#a78bfa"; ctx.strokeStyle = "#0a0c1f"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (d.low) {
+      ctx.fillStyle = "#10b981";
+      ctx.beginPath(); ctx.arc(x, chartState.getY(d.low), 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+
+    const tip = $("chart-tip");
+    const rows = [`<b>${d.t != null ? fmtDate(d.t) : `hace ${data.length - 1 - i} días con ventas`}</b>`,
+      `<span style="color:#a78bfa">Precio medio</span> ${fmt(d.avg)}`];
+    if (d.low) rows.push(`<span style="color:#10b981">Más baja</span> ${fmt(d.low)}`);
+    if (d.sold != null) rows.push(`Vendidos ${fmt(d.sold)}`);
+    if (d.offers != null) rows.push(`Ofertas ${fmt(d.offers)}`);
+    if (current.fair) rows.push(`<span style="color:var(--muted)">vs justo ${pct((d.avg - current.fair) / current.fair)}</span>`);
+    tip.innerHTML = rows.join("<br>");
+    tip.hidden = false;
+    const tw = tip.offsetWidth;
+    tip.style.left = `${x + 12 + tw > w ? x - 12 - tw : x + 12}px`;
+    tip.style.top = `${margin.top}px`;
+  }
+
+  function chartHover(ev) {
+    if (!chartState) return;
+    const rect = $("chart").getBoundingClientRect();
+    const mx = ev.clientX - rect.left;
+    let best = 0;
+    chartState.pts.forEach(([x], i) => { if (Math.abs(x - mx) < Math.abs(chartState.pts[best][0] - mx)) best = i; });
+    if (best === hoverIdx) return;
+    hoverIdx = best;
+    drawChart();
+  }
+  $("chart").addEventListener("pointermove", chartHover);
+  $("chart").addEventListener("pointerdown", chartHover);
+  $("chart").addEventListener("pointerleave", () => { hoverIdx = null; drawChart(); });
+  new ResizeObserver(() => { if (current) drawChart(); }).observe($("chart"));
 
   async function route() {
     const k = location.hash.slice(1);
@@ -1195,17 +1262,19 @@
 
     document.body.style.overflow = "hidden";
     $("overlay").classList.add("active");
-    drawChart(); // Initial draw with sparkline
-    
-    // Fetch deep history
+    currentHistory = null;   // si no, se veía el historial del furni anterior mientras carga el nuevo
+    hoverIdx = null;
+    drawChart();
+
+    // Historial largo
     try {
-      const path = `h/${s.t}/${fileName(s.c)}.json`;
-      const r = await fetch(path);
-      if (r.ok) {
-        currentHistory = await r.json();
-        drawChart();
-      }
-    } catch(e) {}
+      const r = await fetch(`h/${s.t}/${fileName(s.c)}.json`);
+      const hist = r.ok ? await r.json() : { d: {} };
+      if (current === s) { currentHistory = hist; drawChart(); }
+    } catch (e) {
+      if (current === s) { currentHistory = { d: {} }; drawChart(); }
+    }
+    if (current !== s) return;
     
     const radar = $("radar-box");
     radar.hidden = true;
@@ -1249,6 +1318,7 @@
   $("range").addEventListener("click", (ev) => {
     const b = ev.target.closest("button"); if (!b) return;
     rangeDays = Number(b.dataset.days);
+    hoverIdx = null;
     $("range").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
     drawChart();
   });
@@ -1296,6 +1366,7 @@
         location.href = url;
       });
 
+      setupAlerts();
       renderList();
       route();
 
@@ -1364,6 +1435,22 @@
         $("market-title").innerHTML = `<span style="color:var(--red)">Error al cargar datos. Reintente en unos minutos.</span>`;
     });
 
+  function setupAlerts() {
+    if (!index.bot) {
+      document.body.classList.add("no-alerts");
+    } else {
+      $("alerts-container").innerHTML = `
+        <div class="stat-card" style="margin-bottom:24px; background:rgba(124, 58, 237, 0.1); border-color:rgba(124, 58, 237, 0.3); display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h3 style="margin:0 0 4px; font-family:var(--font-head);">Alertas de Telegram Activas</h3>
+            <p style="margin:0; color:var(--muted); font-size:13px;">Recibe notificaciones de gangas y radar directamente en tu móvil.</p>
+          </div>
+          <a href="https://t.me/${index.bot}" target="_blank" class="btn-submit" style="text-decoration:none; padding:10px 20px; font-size:13px;">Unirse al Canal</a>
+        </div>
+      `;
+    }
+  }
+
   // Budget logic simplified for this example
   $("budget-go").addEventListener("click", () => {
     const fee = Number(index.fee_pct ?? 1);
@@ -1418,21 +1505,6 @@
       </div>`;
     bindRows($("budget-out"));
   });
-
-  // Handle Telegram alerts
-  if (!index.bot) {
-    document.body.classList.add("no-alerts");
-  } else {
-    $("alerts-container").innerHTML = `
-      <div class="stat-card" style="margin-bottom:24px; background:rgba(124, 58, 237, 0.1); border-color:rgba(124, 58, 237, 0.3); display:flex; justify-content:space-between; align-items:center;">
-        <div>
-          <h3 style="margin:0 0 4px; font-family:var(--font-head);">Alertas de Telegram Activas</h3>
-          <p style="margin:0; color:var(--muted); font-size:13px;">Recibe notificaciones de gangas y radar directamente en tu móvil.</p>
-        </div>
-        <a href="https://t.me/${index.bot}" target="_blank" class="btn-submit" style="text-decoration:none; padding:10px 20px; font-size:13px;">Unirse al Canal</a>
-      </div>
-    `;
-  }
 
 })();
 </script>
