@@ -370,9 +370,7 @@ def run(site: Path, hotel: str, full_scan: bool, config: dict, hotels: list[str]
             "fee_pct": config.get("comision_pct", 1),
             "updated": items_updated,
             "targets": targets, "catalog_size": len(catalog), "items": items,
-            "bot": (config.get("telegram_bot") or "").lstrip("@") or None,
-            # valores de inicio de la pestaña Gangas; cada visitante los puede cambiar en su navegador,
-            # y el servidor en vivo los usa para el canal de Telegram
+            # valores de inicio de la pestaña Gangas; cada visitante los puede cambiar en su navegador
             "gangas": gangas_defaults(config),
             "live": live_url(config, hotel),
         })

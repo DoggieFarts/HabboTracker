@@ -358,9 +358,6 @@
   }
   .btn-submit:hover { background: var(--accent-strong); }
 
-  .alert-card { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-  .alert-card h3 { margin: 0 0 4px; font-size: 16px; }
-  .alert-card p { margin: 0; color: var(--muted); font-size: 14px; }
 
   /* Índice del mercado */
   .market-index { margin-bottom: 28px; }
@@ -521,7 +518,6 @@
         <p id="market-title">Cargando el mercado…</p>
       </div>
 
-      <div id="alerts-container"></div>
 
       <div class="stats-grid">
         <div class="stat-card">
@@ -639,7 +635,6 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
         <span>Los precios se leen cada 1–2 minutos en los furnis más vendidos y cada varios minutos en el resto: otra persona puede comprar la ganga antes. Revisa el precio en el juego antes de comprar. "Se revende en" es un estimado con las ofertas abiertas y las ventas del último mes.</span>
       </div>
-      <div id="deals-telegram"></div>
       <form class="data-section" id="deal-form" style="margin-bottom:20px" onsubmit="return false">
         <div class="section-header"><h2>Tus filtros</h2></div>
         <div class="deal-filters">
@@ -966,7 +961,7 @@
   }
 
   // ---- Gangas en vivo ----
-  // Misma regla que en_vivo.py usa para el canal de Telegram; aquí cada visitante ajusta sus filtros.
+  // Cada visitante ajusta sus filtros; los valores de inicio vienen de avisos.json (vigia).
   const DEAL_KEY = "gangas-filtros";
   function dealDefaults() {
     const g = (index && index.gangas) || {};
@@ -1015,10 +1010,6 @@
 
   function renderDeals() {
     if (!index) return;
-    const tg = $("deals-telegram");
-    tg.innerHTML = index.bot ? `<div class="stat-card accent alert-card"><div><h3>Avisos en Telegram</h3>
-        <p>El canal avisa al momento con los valores de inicio (${dealDefaults().desc}% de descuento, +${dealDefaults().gan} créditos, revender en ${dealDefaults().dias} día${dealDefaults().dias == 1 ? "" : "s"}).</p></div>
-        <a class="btn-submit" href="https://t.me/${encodeURIComponent(index.bot)}" target="_blank" rel="noopener">Unirse al canal</a></div>` : "";
     const status = $("deals-status");
     if (!index.live) { status.textContent = "Este hotel no tiene precios en vivo."; $("deals").innerHTML = ""; return; }
     if (!live) { status.textContent = "Esperando precios en vivo…"; $("deals").innerHTML = ""; return; }
@@ -1635,7 +1626,6 @@
         location.href = url;
       });
 
-      setupAlerts();
       renderList();
       route();
 
@@ -1712,22 +1702,6 @@
         console.error("Error crítico cargando la aplicación:", err);
         $("market-title").innerHTML = `<span style="color:var(--red)">Error al cargar datos. Reintente en unos minutos.</span>`;
     });
-
-  function setupAlerts() {
-    if (!index.bot) {
-      document.body.classList.add("no-alerts");
-    } else {
-      $("alerts-container").innerHTML = `
-        <div class="stat-card accent alert-card">
-          <div>
-            <h3>Alertas de Telegram</h3>
-            <p style="margin:0; color:var(--muted); font-size:13px;">Recibe notificaciones de gangas y radar directamente en tu móvil.</p>
-          </div>
-          <a href="https://t.me/${index.bot}" target="_blank" class="btn-submit" style="text-decoration:none; padding:10px 20px; font-size:13px;">Unirse al Canal</a>
-        </div>
-      `;
-    }
-  }
 
   // Budget logic simplified for this example
   $("budget-go").addEventListener("click", () => {

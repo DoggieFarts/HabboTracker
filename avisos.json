@@ -8,7 +8,6 @@
   "en_vivo_url": {
     "habbo.es": "https://habbotracker-doggiefarts.mexicocentral.cloudapp.azure.com/vivo.json"
   },
-  "telegram_bot": "",
   "vigia": {
     "descuento_minimo_pct": 15,
     "ganancia_minima": 20,

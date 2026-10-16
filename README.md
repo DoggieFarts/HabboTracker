@@ -7,7 +7,7 @@ Rastreador público de precios del Mercadillo de Habbo (por ejemplo `habbo.es` y
 - **Mercado:** todos los furnis con ventas, con su precio justo (mediana de 30 días), rango normal, minigráfica de 30 días y días para revender. Buscador de los ~18,000 furnis de cada hotel.
 - **Lanzamientos:** furnis nuevos de los últimos 30 días y cuánto han bajado desde su máximo.
 - **Presupuesto:** arma una lista de compras según tus créditos y en cuánto quieres revender.
-- **Gangas (en vivo):** furnis publicados muy por debajo de su precio justo que se venden lo bastante seguido para revenderlos pronto. Cada visitante ajusta sus filtros (descuento, ganancia, días para revender, ventas por día, precio máximo) y se guardan en su navegador. Los raros sin ventas en el último mes no entran: no hay un precio justo confiable con qué compararlos.
+- **Gangas (en vivo):** furnis publicados muy por debajo de su precio justo que se venden lo bastante seguido para revenderlos pronto. Cada visitante ajusta sus filtros (descuento, ganancia, días para revender, ventas por día, precio máximo) y se guardan en su navegador; los valores de inicio salen de `vigia` en `avisos.json`. Los raros sin ventas en el último mes no entran: no hay un precio justo confiable con qué compararlos.
 - **Radar:** furnis cuyas señales (menos ofertas, más ventas, tendencia, caídas que se corrigen) solían venir antes de una subida. Compiten tres modelos: señales lineales, XGBoost (~20 señales, incluido el precio en el otro hotel) y la mezcla de ambos. Se prueban en cada actualización contra el último año sin mirar el futuro, comprando en los 3 días *siguientes* a la señal, y solo se recomienda si el mejor le gana al mercado con claridad y además deja ganancia.
 - **Índice del mercado:** cómo se mueve el precio del furni típico contra su propio nivel de los últimos dos años, con su cambio a 7, 30 y 90 días.
 - **Pronóstico por furni:** rango probable del precio dentro de 14 días (XGBoost por cuantiles) y la probabilidad de ganar si compras al precio actual, ya con comisión. Se dibuja en la gráfica del detalle.
@@ -54,23 +54,3 @@ La máquina baja la versión más reciente de `en_vivo.py` desde el repo cada d�
 ## Lecturas guardadas (para el modelo del mismo día)
 
 `en_vivo.py` guarda cada lectura (hora, furni, oferta más barata, ofertas abiertas) en `/var/lib/mercadillo/historial[-hotel]/AAAA-MM-DD.csv.gz`, unos pocos MB por día, y borra lo que tenga más de `GUARDAR_DIAS` (120 por defecto). Con 4 a 8 semanas de lecturas se podrá entrenar y probar un modelo de reventa el mismo día; antes de eso no hay datos para hacerlo bien.
-
-## Avisos de gangas en Telegram
-
-La regla es la misma de la pestaña Gangas, con los valores de `vigia` en `avisos.json` (`descuento_minimo_pct`, `ganancia_minima`, `dias_max_venta`, `ventas_min_dia`). Para activarlos:
-
-1. En Telegram, habla con **@BotFather**, crea un bot con `/newbot` y copia el token.
-2. Crea un canal público (por ejemplo `@habbomarket_gangas`) y agrega el bot como administrador.
-3. En la máquina de Azure, agrega a `/etc/mercadillo.env` (nunca al repo):
-   ```
-   TELEGRAM_TOKEN=el-token-del-bot
-   TELEGRAM_CANAL=@habbomarket_gangas
-   ```
-   y reinicia el servicio.
-4. En `avisos.json`, pon el canal en `telegram_bot` (sin @) para que la página muestre el botón "Unirse al canal".
-
-No repite el aviso de un furni antes de 6 horas (salvo que baje más) y manda como máximo 20 avisos por hora.
-
-**WhatsApp:** no está implementado. Publicar en un canal de WhatsApp no tiene API oficial; la API de WhatsApp Business solo manda mensajes uno a uno a quien se suscriba, con plantillas aprobadas por Meta y costo por conversación. Las librerías no oficiales violan sus términos y arriesgan el bloqueo del número.
-
-La tarjeta **Precios en Vivo** del panel muestra cuántos precios hay, qué tan recientes son y cada cuántos segundos se refrescan los más vendidos.
