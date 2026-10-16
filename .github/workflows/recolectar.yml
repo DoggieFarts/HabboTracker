@@ -66,18 +66,21 @@ jobs:
 
       - name: Calcular el radar
         continue-on-error: true   # si falla, la página se publica igual
-        timeout-minutes: 10
+        timeout-minutes: 20
         run: |
-          pip install --quiet numpy
+          # xgboost-cpu: el mismo xgboost sin las librerías de GPU (~6 MB en vez de ~200 MB)
+          pip install --quiet numpy xgboost-cpu==3.4.1 || pip install --quiet numpy
           HOTELS=$(python -c "import json; from pathlib import Path; cfg = json.loads(Path('avisos.json').read_text(encoding='utf-8')); hotels = cfg.get('hoteles') or ([cfg.get('hotel')] if cfg.get('hotel') else ['habbo.es']); print(' '.join(h for h in hotels if h))")
-          i=0
+          set -- $HOTELS
+          dir_of() { if [ "$1" = "$2" ]; then echo "sitio"; else echo "sitio/$1"; fi; }
           for hotel in $HOTELS; do
-            sitio_dir="sitio"
-            if [ "$i" -gt 0 ]; then
-              sitio_dir="sitio/$hotel"
-            fi
-            python -u prediccion.py --sitio "$sitio_dir"
-            i=$((i + 1))
+            sitio_dir=$(dir_of "$hotel" "$1")
+            # el otro hotel sirve para comparar el precio del mismo furni en ambos
+            otro=""
+            for h in $HOTELS; do
+              if [ "$h" != "$hotel" ]; then otro="--otro $(dir_of "$h" "$1")"; break; fi
+            done
+            python -u prediccion.py --sitio "$sitio_dir" $otro
           done
 
       - name: Publicar la página
