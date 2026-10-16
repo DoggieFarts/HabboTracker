@@ -445,6 +445,8 @@
   .furni-name { font-weight: 600; display: block; }
   .furni-key { color: var(--muted); font-size: 11px; }
   
+  .spark { display: block; }
+  @media (max-width: 760px) { .col-spark { display: none; } }
   .price-val { font-family: var(--font-head); font-weight: 700; font-size: 16px; }
   .delta-pill { display: inline-flex; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
   .delta-pill.down { background: rgba(16, 185, 129, 0.1); color: var(--green); }
@@ -681,6 +683,7 @@
               <th>Furni</th>
               <th>Precio</th>
               <th>Justo</th>
+              <th class="col-spark">30 días</th>
               <th>Trend</th>
               <th>Mensual</th>
             </tr>
@@ -819,7 +822,7 @@
   
   let index, all = [], current = null, live = null;
   let view = "market", sortMode = "sold", shown = 50, rangeDays = 7, budgetDays = 7;
-  const PAGE = 50, LIVE_EVERY = 30000;
+  const PAGE = 50, LIVE_EVERY = 120000;
 
   function ago(ts) {
     if (!ts) return "nunca";
@@ -881,6 +884,7 @@
     s.perDay = s.sold / 30;
     s.hasFair = s.fair != null;
     s.delta = s.price && s.fair ? (s.price - s.fair) / s.fair : null;
+    s.q = `${s.name || ""} ${k}`.toLowerCase();
     if (index.live) applyLiveTo(s);
     return s;
   }
@@ -898,6 +902,16 @@
     return true;
   }
 
+  // Minigráfica de los últimos 30 días con ventas (s.sp): verde si terminó arriba de donde empezó.
+  function sparkSvg(sp) {
+    const v = (sp || []).filter(Boolean);
+    if (v.length < 2) return `<span style="color:var(--muted)">—</span>`;
+    const W = 96, H = 28, lo = Math.min(...v), hi = Math.max(...v), r = hi - lo || 1;
+    const pts = v.map((p, i) => `${(i / (v.length - 1) * W).toFixed(1)},${(H - 2 - (p - lo) / r * (H - 4)).toFixed(1)}`).join(" ");
+    const color = v[v.length - 1] >= v[0] ? "var(--green)" : "var(--red)";
+    return `<svg class="spark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
+  }
+
   function rowHtml(s) {
     const deltaClass = !s.delta ? "flat" : s.delta < -0.05 ? "down" : s.delta > 0.05 ? "up" : "flat";
     const deltaText = s.delta ? pct(s.delta) : "est.";
@@ -910,17 +924,18 @@
       </td>
       <td><div class="price-val">${s.price ? fmt(s.price) : "—"}</div></td>
       <td><div class="price-val" style="opacity:0.6">${s.fair ? fmt(s.fair) : "—"}</div></td>
+      <td class="col-spark">${sparkSvg(s.spark)}</td>
       <td><div class="delta-pill ${deltaClass}">${deltaText}</div></td>
       <td><div style="font-weight:600">${fmt(s.sold)}</div><div style="font-size:10px; color:var(--muted)">v/mes</div></td>
     </tr>`;
   }
 
   function renderList() {
-    const q = $("q").value.toLowerCase();
-    let rows = all.filter((s) => s.name.toLowerCase().includes(q) || s.key.toLowerCase().includes(q));
+    const q = $("q").value.trim().toLowerCase();
+    let rows = q ? all.filter((s) => s.q.includes(q)) : all.slice();
     if (sortMode === "sold") rows.sort((a, b) => b.sold - a.sold);
     if (sortMode === "price") rows.sort((a, b) => (b.price || 0) - (a.price || 0));
-    if (sortMode === "delta") rows.sort((a, b) => (a.delta || 0) - (b.delta || 0));
+    if (sortMode === "delta") rows.sort((a, b) => (a.delta ?? Infinity) - (b.delta ?? Infinity));
     
     const page = rows.slice(0, shown);
     $("list").innerHTML = page.map((s) => rowHtml(s)).join("");
@@ -1033,7 +1048,7 @@
         let state = '<span class="delta-pill flat">estable</span>';
         if (peak && s.price) {
           const d = (s.price - peak) / peak;
-          state = d < -0.02 ? `<span class="delta-pill up">−${Math.abs(Math.round(d * 100))}% vs max</span>` : `<span class="delta-pill down">máximo</span>`;
+          state = d < -0.02 ? `<span class="delta-pill down">−${Math.abs(Math.round(d * 100))}% vs máx</span>` : `<span class="delta-pill up">en su máximo</span>`;
         }
         return `<tr onclick="location.hash='${s.key}'">
           <td><div class="furni-cell"><div class="furni-icon"><img ${iconAttrs(s)}></div><div>${esc(s.name)}</div></div></td>
@@ -1307,7 +1322,11 @@
     if (b) showView(b.dataset.view);
   });
 
-  $("q").addEventListener("input", () => { shown = PAGE; renderList(); });
+  let searchTimer;
+  $("q").addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { shown = PAGE; renderList(); }, 150);
+  });
   $("sort").addEventListener("click", (ev) => {
     const b = ev.target.closest("button"); if (!b) return;
     sortMode = b.dataset.sort;
@@ -1424,8 +1443,16 @@
             $("live-rows").innerHTML = `<tr><td colspan="4" class="empty">Precios en vivo no disponibles (${esc(reason)}). La página sigue con los datos publicados por GitHub.</td></tr>`;
           }
         }
-        loadLive();
-        setInterval(loadLive, LIVE_EVERY);
+        // cada 2 minutos y solo con la pestaña visible; al volver a ella se pone al día
+        let lastLive = 0;
+        const tickLive = () => {
+          if (document.hidden || Date.now() - lastLive < LIVE_EVERY - 1000) return;
+          lastLive = Date.now();
+          loadLive();
+        };
+        tickLive();
+        setInterval(tickLive, LIVE_EVERY);
+        document.addEventListener("visibilitychange", tickLive);
       } else {
         console.warn("No se configuró URL de datos en vivo para este hotel.");
       }

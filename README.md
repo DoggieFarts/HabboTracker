@@ -4,11 +4,11 @@ Rastreador público de precios del Mercadillo de Habbo (por ejemplo `habbo.es` y
 
 ## Qué tiene
 
-- **Mercado:** todos los furnis con ventas, con su precio justo (mediana de 30 días), rango normal y días para revender. Buscador de los ~18,000 furnis de cada hotel.
+- **Mercado:** todos los furnis con ventas, con su precio justo (mediana de 30 días), rango normal, minigráfica de 30 días y días para revender. Buscador de los ~18,000 furnis de cada hotel.
 - **Lanzamientos:** furnis nuevos de los últimos 30 días y cuánto han bajado desde su máximo.
 - **Presupuesto:** arma una lista de compras según tus créditos y en cuánto quieres revender.
 - **Radar:** furnis cuyas señales (menos ofertas, más ventas, tendencia, caídas que se corrigen) solían venir antes de una subida. Se prueba en cada actualización contra el último año, sin mirar el futuro, y solo recomienda si le gana al mercado con claridad.
-- **Historial de 2 años** por furni, traído de habboapi.site.
+- **Historial de 2 años** por furni, traído de habboapi.site. La gráfica muestra los datos de cada día al pasar el mouse y tiene rangos de 7 días a todo el historial.
 
 ## Archivos
 
@@ -21,7 +21,6 @@ Rastreador público de precios del Mercadillo de Habbo (por ejemplo `habbo.es` y
 | `publicar.sh` | Publica los datos en la rama `datos`, que es la que muestra Pages. |
 | `avisos.json` | Configuración: hoteles, comisión del Mercadillo y dirección de los precios en vivo. |
 | `en_vivo.py` | Corre sin parar en una máquina virtual de Azure y mantiene los precios en vivo. |
-| `azure-cloud-init.yml` | Configuración que se pega al crear la máquina de Azure; la deja instalada sola. |
 | `.github/workflows/recolectar.yml` | Corre el recolector a las 7 a. m. y 7 p. m. (hora del centro de México). |
 | `.github/workflows/historial-completo.yml` | Carga inicial del historial, a mano y una sola vez. |
 
