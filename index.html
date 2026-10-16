@@ -358,9 +358,6 @@
   }
   .btn-submit:hover { background: var(--accent-strong); }
 
-  .alert-card { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-  .alert-card h3 { margin: 0 0 4px; font-size: 16px; }
-  .alert-card p { margin: 0; color: var(--muted); font-size: 14px; }
 
   /* Índice del mercado */
   .market-index { margin-bottom: 28px; }
@@ -387,6 +384,16 @@
   .models-table tbody tr { cursor: default; }
   .models-table tbody tr:hover { background: transparent; }
   .badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; background: var(--accent); color: var(--accent-ink); vertical-align: 1px; }
+
+  .note { font-family: var(--font-body); font-size: 11.5px; font-weight: 500; color: var(--faint); white-space: nowrap; }
+  .deal-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; align-items: end; padding: 18px 20px; }
+  .deal-filters .form-group { margin: 0; }
+  .deal-filters .form-input { min-height: 42px; font-size: 15px; }
+  .deal-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 0 20px 16px; }
+  .btn-ghost { min-height: 40px; padding: 8px 14px; background: transparent; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--muted); cursor: pointer; transition: color .2s, border-color .2s; }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+  .callout { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; margin-bottom: 20px; border-radius: var(--radius-sm); background: var(--accent-soft); border: 1px solid rgba(245, 184, 61, 0.3); font-size: 14px; }
+  .callout svg { flex-shrink: 0; color: var(--accent); margin-top: 2px; }
 
   .empty { padding: 48px 24px; text-align: center; color: var(--muted); }
   .empty strong { display: block; color: var(--text); font-size: 16px; margin-bottom: 6px; }
@@ -468,6 +475,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z"></path></svg>
       <span>Nuevos</span>
     </button>
+    <button class="nav-item" data-view="deals">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+      <span>Gangas</span>
+    </button>
     <button class="nav-item" data-view="budget">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="14" rx="2"></rect><path d="M16 13h2"></path><path d="M2 10h20"></path><path d="M6 6V4h12v2"></path></svg>
       <span>Inversor</span>
@@ -507,7 +518,6 @@
         <p id="market-title">Cargando el mercado…</p>
       </div>
 
-      <div id="alerts-container"></div>
 
       <div class="stats-grid">
         <div class="stat-card">
@@ -614,6 +624,35 @@
       <div id="launches" class="data-section"></div>
     </section>
 
+    <!-- Gangas en vivo -->
+    <section id="deals-view" class="view-content" aria-labelledby="deals-h">
+      <div class="view-header">
+        <p class="eyebrow">En vivo</p>
+        <h1 id="deals-h">Gangas</h1>
+        <p>Furnis que alguien está vendiendo muy por debajo de su precio justo y que se venden lo bastante seguido para revenderlos pronto. Se revisa con cada precio en vivo.</p>
+      </div>
+      <div class="callout" role="note">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <span>Los precios se leen cada 1–2 minutos en los furnis más vendidos y cada varios minutos en el resto: otra persona puede comprar la ganga antes. Revisa el precio en el juego antes de comprar. "Se revende en" es un estimado con las ofertas abiertas y las ventas del último mes.</span>
+      </div>
+      <form class="data-section" id="deal-form" style="margin-bottom:20px" onsubmit="return false">
+        <div class="section-header"><h2>Tus filtros</h2></div>
+        <div class="deal-filters">
+          <div class="form-group"><label class="form-label" for="f-desc">Descuento mínimo (%)</label><input class="form-input" id="f-desc" type="number" min="0" max="90" step="1" inputmode="numeric"></div>
+          <div class="form-group"><label class="form-label" for="f-gan">Ganancia mínima (créditos)</label><input class="form-input" id="f-gan" type="number" min="0" step="1" inputmode="numeric"></div>
+          <div class="form-group"><label class="form-label" for="f-dias">Revender en máximo</label>
+            <select class="form-input" id="f-dias"><option value="0.5">medio día</option><option value="1">1 día</option><option value="2">2 días</option><option value="3">3 días</option><option value="7">7 días</option></select></div>
+          <div class="form-group"><label class="form-label" for="f-ventas">Ventas mínimas por día</label><input class="form-input" id="f-ventas" type="number" min="0" step="0.5" inputmode="decimal"></div>
+          <div class="form-group"><label class="form-label" for="f-max">Precio máximo (opcional)</label><input class="form-input" id="f-max" type="number" min="0" step="1" inputmode="numeric" placeholder="Sin límite"></div>
+        </div>
+        <div class="deal-actions">
+          <span class="note" id="deals-status" aria-live="polite">Esperando precios en vivo…</span>
+          <button type="button" class="btn-ghost" id="deal-reset">Valores de inicio</button>
+        </div>
+      </form>
+      <div class="data-section" id="deals"></div>
+    </section>
+
     <!-- Inversor -->
     <section id="budget-view" class="view-content" aria-labelledby="budget-h">
       <div class="view-header">
@@ -705,7 +744,7 @@
   const esc = (t) => { const e = document.createElement("div"); e.textContent = t; return e.innerHTML; };
   const store = { get: (k) => localStorage.getItem(k), set: (k, v) => localStorage.setItem(k, v) };
   
-  let index, all = [], current = null, live = null;
+  let index, all = [], byKey = new Map(), current = null, live = null;
   let view = "market", sortMode = "sold", shown = 50, rangeDays = 7, budgetDays = 7;
   const PAGE = 50, LIVE_EVERY = 15000;   // en_vivo.py reescribe vivo.json cada 10 s
 
@@ -797,9 +836,12 @@
     return `<svg class="spark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
   }
 
+  // Los raros casi nunca tienen ofertas abiertas (Habbo da precio 0) y se venden poco: se dice así en vez de "—".
+  const noOfferHtml = `<span class="note" title="Nadie lo está vendiendo en este momento">sin ofertas</span>`;
+  const fairHtml = (s) => s.fair ? `${fmt(s.fair)}${s.mw ? ` <span class="note" title="Sin ventas en 30 días: mediana del último año">1 año</span>` : ""}` : "—";
   function rowHtml(s) {
     const deltaClass = !s.delta ? "flat" : s.delta < -0.05 ? "down" : s.delta > 0.05 ? "up" : "flat";
-    const deltaText = s.delta ? pct(s.delta) : "est.";
+    const deltaText = s.delta ? pct(s.delta) : !s.price ? "sin oferta" : "sin justo";
     return `<tr data-key="${s.key}" tabindex="0">
       <td>
         <div class="furni-cell">
@@ -807,8 +849,8 @@
           <div style="min-width:0"><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div>
         </div>
       </td>
-      <td class="r"><span class="price-val">${s.price ? fmt(s.price) : "—"}</span></td>
-      <td class="r col-hide-sm"><span class="price-val" style="color:var(--muted)">${s.fair ? fmt(s.fair) : "—"}</span></td>
+      <td class="r"><span class="price-val">${s.price ? fmt(s.price) : noOfferHtml}</span></td>
+      <td class="r col-hide-sm"><span class="price-val" style="color:var(--muted)">${fairHtml(s)}</span></td>
       <td class="col-spark">${sparkSvg(s.spark)}</td>
       <td class="r"><span class="delta-pill ${deltaClass}">${deltaText}</span></td>
       <td class="r col-hide-sm"><span class="num">${fmt(s.sold)}</span></td>
@@ -916,6 +958,80 @@
         </div>
       </div>`;
     }).join("");
+  }
+
+  // ---- Gangas en vivo ----
+  // Cada visitante ajusta sus filtros; los valores de inicio vienen de avisos.json (vigia).
+  const DEAL_KEY = "gangas-filtros";
+  function dealDefaults() {
+    const g = (index && index.gangas) || {};
+    return { desc: g.descuento_pct ?? 15, gan: g.ganancia ?? 20, dias: g.dias ?? 1, ventas: g.ventas_dia ?? 2, max: "" };
+  }
+  function dealFilters() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(DEAL_KEY) || "{}"); } catch (e) {}
+    return { ...dealDefaults(), ...saved };
+  }
+  function fillDealForm() {
+    const f = dealFilters();
+    $("f-desc").value = f.desc; $("f-gan").value = f.gan; $("f-dias").value = String(f.dias);
+    $("f-ventas").value = f.ventas; $("f-max").value = f.max;
+  }
+  function saveDealForm() {
+    const f = { desc: Number($("f-desc").value) || 0, gan: Number($("f-gan").value) || 0, dias: Number($("f-dias").value) || 1,
+                ventas: Number($("f-ventas").value) || 0, max: $("f-max").value ? Number($("f-max").value) : "" };
+    try { localStorage.setItem(DEAL_KEY, JSON.stringify(f)); } catch (e) {}
+    renderDeals();
+  }
+  ["f-desc", "f-gan", "f-dias", "f-ventas", "f-max"].forEach((id) => $(id).addEventListener("input", saveDealForm));
+  $("deal-reset").addEventListener("click", () => {
+    try { localStorage.removeItem(DEAL_KEY); } catch (e) {}
+    fillDealForm(); renderDeals();
+  });
+
+  function findDeals(f) {
+    if (!live || !live.items) return [];
+    const fee = Number(index.fee_pct ?? 1) / 100;
+    const now = Date.now();
+    const out = [];
+    for (const k of Object.keys(live.items)) {
+      const s = byKey.get(k);
+      // sin precio justo del mes (raros) o recién lanzado: no hay contra qué comparar con confianza
+      if (!s || !s.price || !s.fair || s.mw || s.launched || !s.liveAt) continue;
+      if (s.perDay < f.ventas || (f.max && s.price > f.max)) continue;
+      const profit = Math.round(s.fair * (1 - fee) - s.price);
+      const disc = 1 - s.price / s.fair;
+      const days = (s.offers || 0) / s.perDay;
+      if (disc * 100 < f.desc || profit < f.gan || days > f.dias) continue;
+      out.push({ s, profit, disc, days, age: Math.max(0, Math.round((now - s.liveAt) / 1000)) });
+    }
+    return out.sort((a, b) => b.profit - a.profit);
+  }
+
+  function renderDeals() {
+    if (!index) return;
+    const status = $("deals-status");
+    if (!index.live) { status.textContent = "Este hotel no tiene precios en vivo."; $("deals").innerHTML = ""; return; }
+    if (!live) { status.textContent = "Esperando precios en vivo…"; $("deals").innerHTML = ""; return; }
+    const deals = findDeals(dealFilters());
+    status.textContent = `${fmt(Object.keys(live.items).length)} precios en vivo revisados · ${deals.length} ganga${deals.length === 1 ? "" : "s"} · se actualiza cada 15 s`;
+    if (!deals.length) {
+      $("deals").innerHTML = `<div class="empty"><strong>Ninguna ganga con tus filtros ahora mismo</strong>Prueba bajar el descuento o la ganancia mínima, o dar más días para revender.</div>`;
+      return;
+    }
+    $("deals").innerHTML = `<div class="table-scroll"><table class="market-table"><thead><tr>
+        <th scope="col">Furni</th><th scope="col" class="r">Compra a</th><th scope="col" class="r col-hide-sm">Justo</th>
+        <th scope="col" class="r">Ganancia</th><th scope="col" class="r col-hide-sm">Se revende en</th><th scope="col" class="r col-hide-sm">Leído</th></tr></thead>
+      <tbody>${deals.slice(0, 100).map(({ s, profit, disc, days, age }) => `<tr data-key="${s.key}" tabindex="0">
+        <td><div class="furni-cell"><div class="furni-icon"><img ${iconAttrs(s)} alt=""></div>
+          <div style="min-width:0"><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${Math.round(disc * 100)}% abajo del justo</span></div></div></td>
+        <td class="r"><span class="price-val">${fmt(s.price)}</span></td>
+        <td class="r col-hide-sm"><span class="price-val" style="color:var(--muted)">${fmt(s.fair)}</span></td>
+        <td class="r"><span class="delta-pill down">+${fmt(profit)}</span></td>
+        <td class="r num col-hide-sm">~${days < 1 ? Math.max(1, Math.round(days * 24)) + " h" : days.toFixed(1) + " d"}</td>
+        <td class="r num col-hide-sm" style="color:var(--muted)">${age < 60 ? age + " s" : Math.round(age / 60) + " min"}</td>
+      </tr>`).join("")}</tbody></table></div>`;
+    bindRows($("deals"));
   }
 
   // ---- Live View ----
@@ -1067,7 +1183,10 @@
     if (current.fair) prices.push(current.fair);
     if (fq) prices.push(fq[0], fq[4]);
     let minP = Math.min(...prices), maxP = Math.max(...prices);
-    const pad = (maxP - minP) * 0.08 || maxP * 0.05 || 1;
+    // un precio plano (7, 7, 7…) dejaba el eje en 6.7–7.3 y las cinco marcas decían "7": se abre al menos 4 créditos
+    const minSpan = Math.max(4, maxP * 0.06);
+    if (maxP - minP < minSpan) { const mid = (maxP + minP) / 2; minP = mid - minSpan / 2; maxP = mid + minSpan / 2; }
+    const pad = (maxP - minP) * 0.08;
     minP = Math.max(0, minP - pad); maxP += pad;
 
     const margin = { top: 24, right: 16, bottom: 36, left: 52 };
@@ -1092,15 +1211,18 @@
     // Fechas: marcas repartidas por tiempo, no por número de puntos
     ctx.textAlign = "center";
     ctx.fillStyle = "#94a3b8";
-    const ticks = Math.max(2, Math.min(5, Math.floor(chartW / 90)));
     const span = t1 - t0;
+    // con pocos días, una marca por día como mucho: si no, salía "13 oct, 13 oct, 13 oct"
+    const ticks = Math.max(1, Math.min(5, Math.floor(chartW / 90), dated ? Math.round(span / DAY) : 5));
+    let prevLabel = null;
     for (let k = 0; k <= ticks; k++) {
       const v = t0 + (span * k) / ticks, x = margin.left + (chartW * k) / ticks;
       const label = dated
         ? new Date(v).toLocaleDateString("es-MX", span > 200 * DAY ? { month: "short", year: "2-digit", timeZone: "UTC" } : { day: "numeric", month: "short", timeZone: "UTC" })
         : (k === ticks ? "hoy" : "");
       ctx.textAlign = k === 0 ? "left" : k === ticks ? "right" : "center";   // que la primera y la última no se corten
-      ctx.fillText(label, x, h - 14);
+      if (label !== prevLabel) ctx.fillText(label, x, h - 14);
+      prevLabel = label;
     }
 
     // Ofertas abiertas (barras al fondo)
@@ -1242,8 +1364,8 @@
     icon.style.visibility = iconSrc ? "" : "hidden";
     icon.dataset.alt = getIconAlt(s);
     if (iconSrc) { icon.referrerPolicy = "no-referrer"; icon.src = iconSrc; } else icon.removeAttribute("src");
-    $("detail-price").textContent = s.price ? fmt(s.price) : "—";
-    $("detail-fair").textContent = s.fair ? fmt(s.fair) : "—";
+    $("detail-price").textContent = s.price ? fmt(s.price) : "Sin ofertas";
+    $("detail-fair").innerHTML = fairHtml(s);
     
     // Extra Decision Info
     const extra = $("detail-extra");
@@ -1259,6 +1381,11 @@
     }
     html += `</div>`;
     
+    if (s.us) {
+      const [d, p] = s.us, age = daysAgo(d);
+      html += `<div class="info-row" style="margin-bottom:12px"><span>Última venta: <b class="num">${fmt(p)}</b> (promedio de ese día)</span>
+        <span style="color:var(--muted)">${age <= 0 ? "hoy" : age === 1 ? "ayer" : `hace ${age} días`}</span></div>`;
+    }
     if (s.l && s.h) {
       html += `<div class="info-row">
         <span>Rango normal: <b class="num">${fmt(s.l)}</b> – <b class="num">${fmt(s.h)}</b></span>
@@ -1414,6 +1541,7 @@
     if (name === "radar") renderRadar();
     if (name === "live") renderLiveTab();
     if (name === "launches") renderLaunches();
+    if (name === "deals") { fillDealForm(); renderDeals(); }
   }
   
   document.querySelector(".nav-group").addEventListener("click", (ev) => {
@@ -1474,6 +1602,7 @@
       index = json;
       console.log("Índice cargado:", index.hotel, "Items:", Object.keys(index.items || {}).length, "Actualizado:", index.updated);
       all = Object.entries(index.items || {}).map(([k, e]) => enrich(k, e));
+      byKey = new Map(all.map((x) => [x.key, x]));
       
       $("hero-count").textContent = fmt(all.length);
       $("hotel-name").textContent = index.hotel;
@@ -1497,7 +1626,6 @@
         location.href = url;
       });
 
-      setupAlerts();
       renderList();
       route();
 
@@ -1524,14 +1652,16 @@
             ind.hidden = false;
             if (view === "market") renderList();
             if (view === "live") renderLiveTab();
+            if (view === "deals") renderDeals();
             if (current) {
                 // Si el furni actual tiene precio en vivo, actualizar vista
-                $("detail-price").textContent = current.price ? fmt(current.price) : "—";
+                $("detail-price").textContent = current.price ? fmt(current.price) : "Sin ofertas";
+                if (forecast) renderForecast(current);   // la probabilidad de ganar cambia con el precio en vivo
                 const pill = $("detail-price").parentElement.querySelector(".delta-pill");
                 if (pill) {   // antes fallaba aquí si el detalle no tenía esta etiqueta, y apagaba el "EN VIVO"
                   const delta = current.delta;
                   pill.className = `delta-pill ${!delta ? "flat" : delta < -0.05 ? "down" : delta > 0.05 ? "up" : "flat"}`;
-                  pill.textContent = delta ? pct(delta) : "est.";
+                  pill.textContent = delta ? pct(delta) : "sin oferta";
                 }
             }
           } catch (e) {
@@ -1572,22 +1702,6 @@
         console.error("Error crítico cargando la aplicación:", err);
         $("market-title").innerHTML = `<span style="color:var(--red)">Error al cargar datos. Reintente en unos minutos.</span>`;
     });
-
-  function setupAlerts() {
-    if (!index.bot) {
-      document.body.classList.add("no-alerts");
-    } else {
-      $("alerts-container").innerHTML = `
-        <div class="stat-card accent alert-card">
-          <div>
-            <h3>Alertas de Telegram</h3>
-            <p style="margin:0; color:var(--muted); font-size:13px;">Recibe notificaciones de gangas y radar directamente en tu móvil.</p>
-          </div>
-          <a href="https://t.me/${index.bot}" target="_blank" class="btn-submit" style="text-decoration:none; padding:10px 20px; font-size:13px;">Unirse al Canal</a>
-        </div>
-      `;
-    }
-  }
 
   // Budget logic simplified for this example
   $("budget-go").addEventListener("click", () => {

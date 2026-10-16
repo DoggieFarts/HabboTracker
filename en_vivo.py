@@ -7,6 +7,9 @@ Mercadillo lo más frescos que Habbo permite.
   * Busca solo el ritmo más rápido que Habbo tolera: acelera mientras no haya quejas y frena
     en cuanto pide ir más despacio (error 429), sin volver a bajar de ese ritmo durante una hora.
   * Cada 10 segundos escribe vivo.json, que un servidor web (Caddy) entrega por HTTPS.
+  * Guarda cada lectura en disco (un archivo .csv.gz por día) para entrenar más adelante un modelo de
+    reventa el mismo día. Ocupa unos pocos MB por día; borra los archivos más viejos que GUARDAR_DIAS.
+
 
 Solo usa la biblioteca estándar de Python. La configuración viene de /etc/mercadillo.env:
   SITE_URL   dirección de la página, por ejemplo https://usuario.github.io/mercadillo-habbo
@@ -14,10 +17,13 @@ Solo usa la biblioteca estándar de Python. La configuración viene de /etc/merc
   SALIDA     archivo a escribir (por defecto /var/lib/mercadillo/vivo[-hotel].json)
   TOP        cuántos de los más vendidos se refrescan seguido (por defecto 500)
   PAUSA_MIN  segundos mínimos entre consultas a Habbo (por defecto 1)
+  HISTORIAL  carpeta donde guardar cada lectura (por defecto /var/lib/mercadillo/historial[-hotel])
+  GUARDAR_DIAS  cuántos días de lecturas conservar (por defecto 120)
 """
 
 from __future__ import annotations
 
+import gzip
 import json
 import os
 import signal
@@ -48,6 +54,8 @@ FLOOR_HOURS = 1.0          # cuánto se respeta el ritmo que provocó el último
 INDEX_EVERY = 30 * 60      # recargar la lista de furnis cada media hora
 WRITE_EVERY = 10           # escribir vivo.json cada 10 segundos
 KEEP_SECONDS = 3 * 3600    # en vivo.json solo van precios de las últimas 3 horas
+HIST_DIR = Path(os.environ.get("HISTORIAL", f"/var/lib/mercadillo/historial-{HOTEL_ENV}" if HOTEL_ENV else "/var/lib/mercadillo/historial"))
+KEEP_DAYS = int(os.environ.get("GUARDAR_DIAS", "120"))
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
               "Chrome/130.0 Safari/537.36 Mercadillo-en-vivo/1.0")
 
@@ -172,6 +180,7 @@ class Live:
             self.sleep(30)
             return
         now = int(time.time())
+        rows = []
         for kind, field in (("room", "roomItemData"), ("wall", "wallItemData")):
             for d in data.get(field) or []:
                 try:
@@ -179,12 +188,39 @@ class Live:
                     offers = int(d["currentOpenOffers"]) if d.get("currentOpenOffers") is not None else None
                 except (TypeError, ValueError):
                     continue
-                self.prices[f"{kind}:{d.get('item')}"] = [price, offers, now]
+                key = f"{kind}:{d.get('item')}"
+                self.prices[key] = [price, offers, now]
+                rows.append(f"{now},{key},{price or ''},{'' if offers is None else offers}\n")
+        self.save_rows(rows)
         self.calm += 1
         if self.floor > MIN_PAUSE and time.time() > self.floor_until:
             self.floor = MIN_PAUSE                       # pasó la hora: se vuelve a probar más rápido
         if self.calm >= CALM_TO_SPEED_UP and self.pause > self.floor:  # sin quejas: se acelera un poco
             self.pause, self.calm = max(self.floor, self.pause * 0.9), 0
+
+    # ---- lecturas guardadas (para el modelo de reventa del mismo día) ----
+    def save_rows(self, rows: list[str]) -> None:
+        if not rows:
+            return
+        try:
+            HIST_DIR.mkdir(parents=True, exist_ok=True)
+            day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            path = HIST_DIR / f"{day}.csv.gz"
+            new = not path.exists()
+            # gzip en modo "a" agrega un bloque nuevo; cualquier lector de gzip lee todos los bloques seguidos
+            with gzip.open(path, "at", encoding="utf-8") as f:
+                if new:
+                    f.write("t,clave,precio,ofertas\n")
+                    self.prune_history()
+                f.writelines(rows)
+        except OSError as e:
+            log(f"No se pudo guardar el historial ({e}).")
+
+    def prune_history(self) -> None:
+        cutoff = time.time() - KEEP_DAYS * 86400
+        for f in HIST_DIR.glob("*.csv.gz"):
+            if f.stat().st_mtime < cutoff:
+                f.unlink(missing_ok=True)
 
     def write(self) -> None:
         now = int(time.time())
@@ -208,7 +244,7 @@ class Live:
         if not SITE_URL:
             log("Falta SITE_URL en /etc/mercadillo.env.")
             sys.exit(1)
-        log(f"Iniciando con la página {SITE_URL}.")
+        log(f"Iniciando con la página {SITE_URL}. Lecturas en {HIST_DIR}.")
         last_report = time.time()
         while running:
             if time.time() - self.index_at > INDEX_EVERY:

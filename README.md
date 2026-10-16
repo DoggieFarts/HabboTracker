@@ -7,6 +7,7 @@ Rastreador público de precios del Mercadillo de Habbo (por ejemplo `habbo.es` y
 - **Mercado:** todos los furnis con ventas, con su precio justo (mediana de 30 días), rango normal, minigráfica de 30 días y días para revender. Buscador de los ~18,000 furnis de cada hotel.
 - **Lanzamientos:** furnis nuevos de los últimos 30 días y cuánto han bajado desde su máximo.
 - **Presupuesto:** arma una lista de compras según tus créditos y en cuánto quieres revender.
+- **Gangas (en vivo):** furnis publicados muy por debajo de su precio justo que se venden lo bastante seguido para revenderlos pronto. Cada visitante ajusta sus filtros (descuento, ganancia, días para revender, ventas por día, precio máximo) y se guardan en su navegador; los valores de inicio salen de `vigia` en `avisos.json`. Los raros sin ventas en el último mes no entran: no hay un precio justo confiable con qué compararlos.
 - **Radar:** furnis cuyas señales (menos ofertas, más ventas, tendencia, caídas que se corrigen) solían venir antes de una subida. Compiten tres modelos: señales lineales, XGBoost (~20 señales, incluido el precio en el otro hotel) y la mezcla de ambos. Se prueban en cada actualización contra el último año sin mirar el futuro, comprando en los 3 días *siguientes* a la señal, y solo se recomienda si el mejor le gana al mercado con claridad y además deja ganancia.
 - **Índice del mercado:** cómo se mueve el precio del furni típico contra su propio nivel de los últimos dos años, con su cambio a 7, 30 y 90 días.
 - **Pronóstico por furni:** rango probable del precio dentro de 14 días (XGBoost por cuantiles) y la probabilidad de ganar si compras al precio actual, ya con comisión. Se dibuja en la gráfica del detalle.
@@ -50,8 +51,6 @@ La página lo consulta cada 15 segundos (solo con la pestaña visible; si el arc
 
 La máquina baja la versión más reciente de `en_vivo.py` desde el repo cada día a las 10:00 UTC, así que para actualizarla basta con cambiar el archivo en GitHub.
 
-## Alertas
+## Lecturas guardadas (para el modelo del mismo día)
 
-Las alertas por Telegram están desactivadas por ahora. Mientras `telegram_bot` esté vacío en `avisos.json`, la página no muestra nada relacionado con alertas.
-
-La tarjeta **Precios en Vivo** del panel muestra cuántos precios hay, qué tan recientes son y cada cuántos segundos se refrescan los más vendidos.
+`en_vivo.py` guarda cada lectura (hora, furni, oferta más barata, ofertas abiertas) en `/var/lib/mercadillo/historial[-hotel]/AAAA-MM-DD.csv.gz`, unos pocos MB por día, y borra lo que tenga más de `GUARDAR_DIAS` (120 por defecto). Con 4 a 8 semanas de lecturas se podrá entrenar y probar un modelo de reventa el mismo día; antes de eso no hay datos para hacerlo bien.

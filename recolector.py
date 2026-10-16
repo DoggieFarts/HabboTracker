@@ -223,6 +223,24 @@ def weighted_percentile(pairs: list[tuple[int, int]], q: float) -> int | None:
     return pairs[-1][0]
 
 
+def long_summary(days: dict[str, list]) -> dict:
+    """Para furnis que casi no se venden (raros): última venta y precio justo con el último año.
+    Con solo 30 días, un raro que se vendió hace 6 semanas quedaba sin ningún dato en la página."""
+    sales = sorted((d, v) for d, v in days.items() if v[0])
+    if not sales:
+        return {"last_sale": None, "fair_year": None}
+    last_day = date.fromisoformat(sales[-1][0])
+    since = (last_day - timedelta(days=364)).isoformat()
+    pairs = [(v[0], v[1] or 1) for d, v in sales if d >= since]
+    return {"last_sale": [sales[-1][0], sales[-1][1][0]], "fair_year": weighted_percentile(pairs, 0.5)}
+
+
+def gangas_defaults(config: dict) -> dict:
+    v = config.get("vigia") or {}
+    return {"descuento_pct": v.get("descuento_minimo_pct", 15), "ganancia": v.get("ganancia_minima", 20),
+            "dias": v.get("dias_max_venta", 1), "ventas_dia": v.get("ventas_min_dia", 2)}
+
+
 def summarize(days: dict[str, list]) -> dict:
     """Resumen de los últimos 30 días con ventas: volumen, minigráfica, precio justo y rango normal."""
     with_avg = [d for d, v in days.items() if v[0]]
@@ -352,7 +370,8 @@ def run(site: Path, hotel: str, full_scan: bool, config: dict, hotels: list[str]
             "fee_pct": config.get("comision_pct", 1),
             "updated": items_updated,
             "targets": targets, "catalog_size": len(catalog), "items": items,
-            "bot": (config.get("telegram_bot") or "").lstrip("@") or None,
+            # valores de inicio de la pestaña Gangas; cada visitante los puede cambiar en su navegador
+            "gangas": gangas_defaults(config),
             "live": live_url(config, hotel),
         })
         
@@ -430,11 +449,16 @@ def run(site: Path, hotel: str, full_scan: bool, config: dict, hotels: list[str]
             found_total += 1
             offers = to_int(stats.get("currentOpenOffers"))
             per_day = sm["sold"] / 30
+            ls = long_summary(days)
             entry = {"n": names.get(key, cls), "c": cls, "t": kind, "p": current,
                      "a": to_int(stats.get("averagePrice")) or sm["avg"], "s": sm["sold"], "o": offers,
                      "sp": sm["spark"], "m": sm["fair"], "l": sm["low"], "h": sm["high"],
                      "dr": round(offers / per_day, 1) if offers and per_day else None,  # sin ofertas no hay dato
                      "u": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+            if ls["last_sale"]:
+                entry["us"] = ls["last_sale"]                 # última venta: [fecha, precio promedio de ese día]
+            if entry["m"] is None and ls["fair_year"]:
+                entry["m"], entry["mw"] = ls["fair_year"], 365  # sin ventas en 30 días: precio justo del último año
             if key in launches:
                 entry["f"] = launches[key]
             items[key] = entry
