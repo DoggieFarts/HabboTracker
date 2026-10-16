@@ -4,14 +4,16 @@ Mercadillo lo más frescos que Habbo permite.
 
   * Toma la lista de furnis activos de la página publicada (indice.json), sin acceso al repo.
   * Consulta primero los más vendidos (se refrescan cada par de minutos) y va rotando el resto.
-  * Ajusta su ritmo solo cuando Habbo pide ir más despacio (error 429).
-  * Cada 20 segundos escribe vivo.json, que un servidor web (Caddy) entrega por HTTPS.
+  * Busca solo el ritmo más rápido que Habbo tolera: acelera mientras no haya quejas y frena
+    en cuanto pide ir más despacio (error 429), sin volver a bajar de ese ritmo durante una hora.
+  * Cada 10 segundos escribe vivo.json, que un servidor web (Caddy) entrega por HTTPS.
 
 Solo usa la biblioteca estándar de Python. La configuración viene de /etc/mercadillo.env:
   SITE_URL   dirección de la página, por ejemplo https://usuario.github.io/mercadillo-habbo
   HOTEL      hotel a seguir; si se omite, toma el que publique la página
   SALIDA     archivo a escribir (por defecto /var/lib/mercadillo/vivo[-hotel].json)
   TOP        cuántos de los más vendidos se refrescan seguido (por defecto 500)
+  PAUSA_MIN  segundos mínimos entre consultas a Habbo (por defecto 1)
 """
 
 from __future__ import annotations
@@ -38,10 +40,13 @@ HOTEL_ENV = os.environ.get("HOTEL", "").strip()
 OUT = Path(os.environ.get("SALIDA", f"/var/lib/mercadillo/vivo-{HOTEL_ENV}.json" if HOTEL_ENV else "/var/lib/mercadillo/vivo.json"))
 TOP = int(os.environ.get("TOP", "500"))
 BATCH = 20                 # máximo que acepta Habbo por consulta
-BASE_PAUSE = 3.0
+BASE_PAUSE = 3.0           # ritmo inicial
+MIN_PAUSE = max(0.5, float(os.environ.get("PAUSA_MIN", "1.0")))   # nunca más rápido que esto
 MAX_PAUSE = 20.0
+CALM_TO_SPEED_UP = 30      # consultas seguidas sin 429 antes de acelerar un poco
+FLOOR_HOURS = 1.0          # cuánto se respeta el ritmo que provocó el último 429
 INDEX_EVERY = 30 * 60      # recargar la lista de furnis cada media hora
-WRITE_EVERY = 20           # escribir vivo.json cada 20 segundos
+WRITE_EVERY = 10           # escribir vivo.json cada 10 segundos
 KEEP_SECONDS = 3 * 3600    # en vivo.json solo van precios de las últimas 3 horas
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
               "Chrome/130.0 Safari/537.36 Mercadillo-en-vivo/1.0")
@@ -90,6 +95,8 @@ class Live:
         self.prices: dict[str, list] = {}   # clave -> [oferta más baja, ofertas abiertas, hora unix]
         self.pause = BASE_PAUSE
         self.calm = 0
+        self.floor = MIN_PAUSE        # ritmo más rápido permitido ahora (sube tras un 429)
+        self.floor_until = 0.0
         self.index_at = 0.0
         self.written_at = 0.0
         self.top_started = time.time()
@@ -149,6 +156,9 @@ class Live:
         except urllib.error.HTTPError as e:
             if e.code == 429:
                 wait = retry_after(e) or 30
+                # este ritmo fue demasiado: no volver a él durante un rato
+                self.floor = min(MAX_PAUSE, max(self.floor, self.pause * 1.25))
+                self.floor_until = time.time() + FLOOR_HOURS * 3600
                 self.pause, self.calm = min(MAX_PAUSE, self.pause * 1.6 + 0.5), 0
                 self.limited += 1
                 log(f"Habbo pidió ir más lento; espero {wait} s y dejo {self.pause:.1f} s entre consultas.")
@@ -171,15 +181,17 @@ class Live:
                     continue
                 self.prices[f"{kind}:{d.get('item')}"] = [price, offers, now]
         self.calm += 1
-        if self.calm >= 60 and self.pause > BASE_PAUSE:  # un buen rato sin quejas: se acelera un poco
-            self.pause, self.calm = max(BASE_PAUSE, self.pause * 0.85), 0
+        if self.floor > MIN_PAUSE and time.time() > self.floor_until:
+            self.floor = MIN_PAUSE                       # pasó la hora: se vuelve a probar más rápido
+        if self.calm >= CALM_TO_SPEED_UP and self.pause > self.floor:  # sin quejas: se acelera un poco
+            self.pause, self.calm = max(self.floor, self.pause * 0.9), 0
 
     def write(self) -> None:
         now = int(time.time())
         fresh = {k: [p, o, now - t] for k, (p, o, t) in self.prices.items() if now - t <= KEEP_SECONDS}
         self.prices = {k: v for k, v in self.prices.items() if now - v[2] <= KEEP_SECONDS}
         body = {"updated": datetime.now(timezone.utc).isoformat(timespec="seconds"), "t": now,
-                "hotel": self.hotel, "pause": round(self.pause, 1), "top_cycle_s": self.top_cycle,
+                "hotel": self.hotel, "pause": round(self.pause, 1), "top": len(self.top), "top_cycle_s": self.top_cycle,
                 "items": fresh}
         OUT.parent.mkdir(parents=True, exist_ok=True)
         tmp = OUT.with_suffix(".tmp")

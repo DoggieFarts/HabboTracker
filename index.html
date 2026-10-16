@@ -649,22 +649,22 @@
         <div class="stat-card">
           <span class="label">Total Activos</span>
           <span class="value" id="hero-count">—</span>
-          <span class="trend up">Monitoreando</span>
+          <span class="trend" id="stat-active">—</span>
         </div>
         <div class="stat-card">
           <span class="label">Hotel Activo</span>
           <span class="value" id="hotel-name">.ES</span>
-          <span class="trend">Actualizado</span>
+          <span class="trend" id="stat-updated">—</span>
         </div>
         <div class="stat-card">
-          <span class="label">Oportunidades</span>
+          <span class="label" title="Furnis más de 15% abajo de su precio justo">Oportunidades</span>
           <span class="value" id="opportunity-count">0</span>
-          <span class="trend down">Radar Activo</span>
+          <span class="trend" id="stat-radar">—</span>
         </div>
         <div class="stat-card">
-          <span class="label">Estado de Red</span>
-          <span class="value">Óptimo</span>
-          <span class="trend up">Sync 100%</span>
+          <span class="label">Precios en Vivo</span>
+          <span class="value" id="stat-live">—</span>
+          <span class="trend" id="stat-live-detail">—</span>
         </div>
       </div>
       
@@ -822,7 +822,7 @@
   
   let index, all = [], current = null, live = null;
   let view = "market", sortMode = "sold", shown = 50, rangeDays = 7, budgetDays = 7;
-  const PAGE = 50, LIVE_EVERY = 120000;
+  const PAGE = 50, LIVE_EVERY = 15000;   // en_vivo.py reescribe vivo.json cada 10 s
 
   function ago(ts) {
     if (!ts) return "nunca";
@@ -1303,6 +1303,49 @@
   }
   window.addEventListener("hashchange", route);
 
+  // ---- Tarjetas de estado (todo sale de los datos, nada fijo) ----
+  const STALE_INDEX = 14 * 3600000;   // el recolector corre cada 12 h
+  let liveError = null;
+  function setTrend(id, text, tone) {
+    const el = $(id);
+    el.textContent = text;
+    el.className = `trend${tone ? " " + tone : ""}`;
+  }
+  function renderStats() {
+    if (!index) return;
+    const selling = all.filter((s) => s.sold > 0).length;
+    setTrend("stat-active", `${fmt(selling)} con ventas en 30 días`);
+
+    const age = Date.now() - new Date(index.updated);
+    setTrend("stat-updated", `Datos ${ago(index.updated)}`, age > STALE_INDEX ? "down" : "up");
+    $("meta").textContent = `Actualizado ${ago(index.updated)}`;
+    $("hero-sync-nexora").textContent = ago(index.updated);
+
+    if (prediction) {
+      const n = (prediction.picks || []).filter((p) => p.expected > 0.02).length;
+      setTrend("stat-radar", n ? `${n} en el radar` : "Radar sin recomendaciones", n ? "up" : "");
+    }
+
+    if (!index.live) {
+      $("stat-live").textContent = "Apagado";
+      setTrend("stat-live-detail", "Este hotel no tiene servidor en vivo");
+    } else if (live && live.t) {
+      const lag = Math.max(0, Math.round(Date.now() / 1000 - live.t));
+      const stale = lag > 120 || liveError;
+      $("stat-live").textContent = stale ? "Atrasado" : "En vivo";
+      const parts = [`${fmt(Object.keys(live.items || {}).length)} precios`, `hace ${lag < 60 ? lag + " s" : Math.round(lag / 60) + " min"}`];
+      if (live.top_cycle_s) parts.push(`${live.top ? "top " + fmt(live.top) : "más vendidos"} cada ${Math.round(live.top_cycle_s)} s`);
+      setTrend("stat-live-detail", liveError ? `Sin conexión (${liveError}); último dato ${parts[1]}` : parts.join(" · "), stale ? "down" : "up");
+    } else if (liveError) {
+      $("stat-live").textContent = "Sin conexión";
+      setTrend("stat-live-detail", liveError, "down");
+    } else {
+      $("stat-live").textContent = "…";
+      setTrend("stat-live-detail", "Conectando");
+    }
+  }
+  setInterval(renderStats, 5000);
+
   // ---- App Logic ----
   function showView(name) {
     view = name;
@@ -1368,9 +1411,8 @@
       $("hero-hotel-nexora").textContent = index.hotel.toUpperCase();
       $("market-title").textContent = `Analizando el mercado de ${index.hotel.toUpperCase()}, ${fmt(all.length)} furnis rastreados`;
       
-      const metaStr = `Actualizado ${ago(index.updated)}`;
-      $("meta").textContent = metaStr;
-      $("hero-sync-nexora").textContent = ago(index.updated);
+      renderStats();
+      loadPrediction().then(renderStats);
       
       // Hotel switch
       const switchEl = $("hotel-switch");
@@ -1393,15 +1435,18 @@
         console.log("Iniciando seguimiento en vivo:", index.live);
         const loadLive = async () => {
           try {
-            const r = await fetch(index.live, { cache: "no-store" });
+            // no-cache: el navegador revalida con ETag y, si vivo.json no cambió, no lo vuelve a bajar
+            const r = await fetch(index.live, { cache: "no-cache" });
             if (!r.ok) {
                 console.error("Fallo al cargar datos en vivo:", r.status, r.statusText);
                 showLiveProblem(`el servidor respondió ${r.status}`);
                 return;
             }
             const data = await r.json();
-            console.log("Datos en vivo recibidos:", Object.keys(data.items || {}).length, "furnis");
+            liveError = null;
+            if (live && data.t === live.t) { renderStats(); return; }   // mismo archivo: nada que redibujar
             live = data;
+            renderStats();
             all.forEach(applyLiveTo);
             const ind = $("live-indicator");
             ind.classList.remove("offline");
@@ -1434,6 +1479,8 @@
           }
         };
         function showLiveProblem(reason) {
+          liveError = reason;
+          renderStats();
           const ind = $("live-indicator");
           ind.classList.add("offline");
           ind.querySelector("span:last-child").textContent = "SIN EN VIVO";
@@ -1443,7 +1490,7 @@
             $("live-rows").innerHTML = `<tr><td colspan="4" class="empty">Precios en vivo no disponibles (${esc(reason)}). La página sigue con los datos publicados por GitHub.</td></tr>`;
           }
         }
-        // cada 2 minutos y solo con la pestaña visible; al volver a ella se pone al día
+        // cada 15 s y solo con la pestaña visible; al volver a ella se pone al día
         let lastLive = 0;
         const tickLive = () => {
           if (document.hidden || Date.now() - lastLive < LIVE_EVERY - 1000) return;
