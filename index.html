@@ -3,791 +3,636 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0a0a0a">
+<meta name="theme-color" content="#070b14">
+<meta name="description" content="Precios del Mercadillo de Habbo: precio justo, historial de 2 años, precios en vivo y radar de oportunidades.">
 <title>Habbo Market — HabboTracker</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 5 5' shape-rendering='crispEdges'%3E%3Cpath fill='%238C5E06' d='M1 0h3v5H1zM0 1h5v3H0z'/%3E%3Cpath fill='%23D6961A' d='M1 1h3v3H1z'/%3E%3Cpath fill='%23F6D46B' d='M1 1h1v1H1z'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&family=Instrument+Serif:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+  /* Sistema de diseño (skill ui-ux-pro-max): Dark Mode OLED, Fira Sans + Fira Code, acento oro crédito */
   :root {
-    --bg: #080a19;
-    --sidebar-bg: #0a0c1f;
-    --card-bg: rgba(255, 255, 255, 0.03);
-    --border: rgba(255, 255, 255, 0.08);
-    --text: #ffffff;
-    --muted: #a1a1a1;
-    --accent: #7c3aed; /* Monogram Purple */
-    --accent-hover: #8b5cf6;
-    --green: #10b981;
-    --red: #ef4444;
-    --font-head: 'Space Grotesk', sans-serif;
-    --font-body: 'Inter', sans-serif;
-    --font-nexora: 'Instrument Serif', serif;
-    --font-habbo: 'Instrument Serif', serif;
-    --sidebar-width: 260px;
-    --topbar-height: 70px;
+    --bg: #070b14;
+    --surface: #0d1320;
+    --surface-2: #131b2b;
+    --surface-3: #1a2436;
+    --border: #1f2a3d;
+    --border-strong: #2c3a52;
+    --text: #e8ecf3;
+    --muted: #94a3b8;          /* 6.8:1 sobre --surface */
+    --faint: #64748b;
+    --accent: #f5b83d;         /* oro de los créditos de Habbo */
+    --accent-strong: #ffc857;
+    --accent-ink: #1a1203;     /* texto sobre el oro */
+    --accent-soft: rgba(245, 184, 61, 0.12);
+    --green: #34d399;
+    --green-soft: rgba(52, 211, 153, 0.12);
+    --red: #f87171;
+    --red-soft: rgba(248, 113, 113, 0.12);
+    --font-head: 'Fira Sans', system-ui, sans-serif;
+    --font-body: 'Fira Sans', system-ui, sans-serif;
+    --mono: 'Fira Code', ui-monospace, monospace;
+    --radius: 14px;
+    --radius-sm: 10px;
+    --sidebar-width: 248px;
+    --topbar-height: 64px;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    /* capas */
+    --z-sticky: 10; --z-nav: 20; --z-overlay: 50;
   }
-  
+
   * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
     font-family: var(--font-body);
-    font-size: 14px;
-    height: 100vh;
+    font-size: 15px;
+    line-height: 1.5;
     overflow-x: hidden;
-    overflow-y: auto;
-    scroll-behavior: smooth;
-    scroll-snap-type: y mandatory;
   }
-  
-  /* Habbo Market Hero Section */
-  .nexora-nav {
-    position: absolute;
-    top: 24px;
-    left: 0;
-    right: 0;
-    display: flex;
-    justify-content: center;
-    z-index: 100;
-    padding: 0 24px;
-  }
-  .nexora-nav-inner {
-    background: rgba(10, 10, 10, 0.6);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 16px;
-    padding: 8px 24px;
-    display: flex;
-    align-items: center;
-    gap: 32px;
-  }
-  .nexora-nav-logo {
-    font-family: var(--font-habbo);
-    font-size: 24px;
-    font-weight: 400;
-    font-style: italic;
-    color: var(--text);
-    text-decoration: none;
-  }
-  .nexora-nav-links {
-    display: flex;
-    gap: 24px;
-  }
-  .nexora-nav-link {
-    color: var(--muted);
-    text-decoration: none;
-    font-size: 13px;
-    font-weight: 500;
-    transition: 0.2s;
-  }
-  .nexora-nav-link:hover { color: var(--text); }
-  
-  @media (max-width: 767px) {
-    .nexora-nav-links { display: none; }
-  }
+  button, input, select { font: inherit; color: inherit; }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .num, .price-val, .value, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
-  .nexora-hero {
-    position: relative;
-    width: 100%;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    overflow: hidden;
-    background: #080a19;
-    scroll-snap-align: start;
-  }
-  .nexora-hero::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 20vh;
-    background: linear-gradient(to bottom, transparent, var(--bg));
-    z-index: 5;
-    pointer-events: none;
-  }
-  .nexora-video {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    z-index: 1;
-    opacity: 0.8;
-  }
-  .nexora-overlay {
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.6) 100%);
-    z-index: 2;
-  }
-  .nexora-content {
-    position: relative;
-    z-index: 10;
-    max-width: 900px;
-    padding: 0 24px;
-  }
-  .nexora-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 16px;
-    background: rgba(124, 58, 237, 0.1);
-    border: 1px solid rgba(124, 58, 237, 0.2);
-    border-radius: 99px;
-    color: var(--accent);
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 32px;
-    animation: fade-down 0.8s ease-out;
-  }
-  .nexora-badge.live {
-    animation: fade-down 0.8s ease-out, pulse-ring 2s infinite;
-  }
-  .nexora-title {
-    font-family: var(--font-habbo);
-    font-size: clamp(40px, 10vw, 100px);
-    line-height: 0.95;
-    margin-bottom: 24px;
-    font-style: italic;
-    font-weight: 400;
-    animation: fade-up 1s ease-out 0.2s both;
-  }
-  .nexora-title span { display: block; }
-  .nexora-desc {
-    font-size: 18px;
-    color: var(--muted);
-    max-width: 600px;
-    margin: 0 auto 40px;
-    animation: fade-up 1s ease-out 0.4s both;
-  }
-  .nexora-actions {
-    display: flex;
-    gap: 16px;
-    justify-content: center;
-    animation: fade-up 1s ease-out 0.6s both;
-  }
-  .btn-nexora {
-    padding: 16px 32px;
-    border-radius: 12px;
-    font-weight: 600;
-    text-decoration: none;
-    transition: 0.3s;
-    cursor: pointer;
-  }
-  .btn-nexora-primary {
-    background: var(--text);
-    color: #000;
-    border: none;
-  }
-  .btn-nexora-primary:hover { transform: scale(1.05); }
-  .btn-nexora-outline {
-    background: transparent;
-    border: 1px solid rgba(255,255,255,0.2);
-    color: var(--text);
-  }
-  .btn-nexora-outline:hover { background: rgba(255,255,255,0.05); }
+  #dashboard-root { display: flex; min-height: 100vh; }
 
-  @keyframes fade-up {
-    from { opacity: 0; transform: translateY(30px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes fade-down {
-    from { opacity: 0; transform: translateY(-30px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  #dashboard-root {
-    display: flex;
-    width: 100%;
-    background: var(--bg);
-    scroll-snap-align: start;
-    position: relative;
-    min-height: 100vh;
-  }
-
-  /* Sidebar Adjustment */
+  /* ---------- Barra lateral ---------- */
   .sidebar {
     width: var(--sidebar-width);
-    background: var(--sidebar-bg);
+    background: var(--surface);
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    padding: 24px;
+    padding: 20px 14px;
     flex-shrink: 0;
     position: sticky;
     top: 0;
     height: 100vh;
-    z-index: 50;
-    overflow-y: auto;
+    z-index: var(--z-nav);
   }
   .logo {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-family: var(--font-head);
-    font-weight: 700;
-    font-size: 20px;
-    margin-bottom: 40px;
-    color: var(--text);
-    text-decoration: none;
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px 22px;
+    font-weight: 700; font-size: 18px; letter-spacing: -0.01em;
+    color: var(--text); text-decoration: none;
   }
   .logo-icon {
-    width: 32px;
-    height: 32px;
-    background: var(--accent);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
+    width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--accent-strong), #d6961a);
+    color: var(--accent-ink);
+    display: grid; place-items: center;
+    font-family: var(--mono); font-weight: 600;
   }
-  
-  .nav-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
+  .logo small { display: block; font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+  .nav-label { padding: 0 12px 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+  .nav-group { display: flex; flex-direction: column; gap: 4px; }
   .nav-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px;
-    border-radius: 10px;
-    color: var(--muted);
-    text-decoration: none;
-    transition: all 0.2s;
-    font-weight: 500;
-    cursor: pointer;
-    border: none;
+    display: flex; align-items: center; gap: 12px;
+    min-height: 44px; padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
     background: transparent;
-    width: 100%;
-    text-align: left;
-    font-family: inherit;
-    font-size: inherit;
+    color: var(--muted);
+    font-weight: 500; text-align: left; width: 100%;
+    cursor: pointer;
+    transition: color .2s, background-color .2s, border-color .2s;
   }
-  .nav-item svg { width: 20px; height: 20px; }
-  .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.05); }
-  .nav-item.active { color: var(--text); background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.2); }
+  .nav-item svg { width: 20px; height: 20px; flex-shrink: 0; }
+  .nav-item:hover { color: var(--text); background: var(--surface-2); }
+  .nav-item.active { color: var(--text); background: var(--accent-soft); border-color: rgba(245, 184, 61, 0.25); }
   .nav-item.active svg { color: var(--accent); }
-  
-  .sidebar-footer {
-    margin-top: auto;
-    padding-top: 24px;
-    border-top: 1px solid var(--border);
+  .sidebar-footer { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); }
+  .sidebar-footer label { display: block; font-size: 12px; color: var(--muted); margin: 0 4px 6px; }
+
+  .hotel-select {
+    width: 100%; min-height: 44px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: border-color .2s;
   }
-  
-  /* Main Content */
-  .main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    position: relative;
-  }
-  
-  /* Top Bar */
+  .hotel-select:hover { border-color: var(--border-strong); }
+
+  /* ---------- Área principal ---------- */
+  .main-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .top-bar {
+    position: sticky; top: 0; z-index: var(--z-sticky);
     height: var(--topbar-height);
-    padding: 0 40px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    padding: 0 32px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    background: rgba(7, 11, 20, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
   }
-  .search-wrapper {
-    position: relative;
-    width: 400px;
-  }
+  .search-wrapper { position: relative; flex: 1; max-width: 460px; }
   .search-wrapper input {
-    width: 100%;
-    background: var(--card-bg);
+    width: 100%; min-height: 42px;
+    background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 10px 16px 10px 40px;
-    color: var(--text);
+    border-radius: var(--radius-sm);
+    padding: 9px 56px 9px 40px;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color .2s, box-shadow .2s;
   }
-  .search-wrapper input:focus { border-color: var(--accent); }
-  .search-wrapper svg {
-    position: absolute;
-    left: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--muted);
-    width: 18px;
-    height: 18px;
+  .search-wrapper input::placeholder { color: var(--faint); }
+  .search-wrapper input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .search-wrapper svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); width: 18px; height: 18px; pointer-events: none; }
+  .search-wrapper kbd {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    border: 1px solid var(--border-strong); border-radius: 6px; padding: 1px 7px;
   }
-  
-  .top-actions {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-  }
+  .top-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
   .status-pill {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    background: rgba(16, 185, 129, 0.1);
-    color: var(--green);
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-  }
-  .status-pill.offline {
-    background: rgba(239, 68, 68, 0.1);
-    color: var(--red);
-  }
-  .pulse {
-    width: 8px;
-    height: 8px;
-    background: currentColor;
-    border-radius: 50%;
-    animation: pulse-ring 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
-  }
-  @keyframes pulse-ring { 0% { transform: scale(0.33); opacity: 1; } 80%, 100% { opacity: 0; } }
-  
-  .hotel-select {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 6px 12px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-family: inherit;
-  }
-
-  /* Dashboard Content */
-  .content-scroll {
-    flex: 1;
-    padding: 40px;
-  }
-  
-  .view-header {
-    margin-bottom: 32px;
-  }
-  .view-header h1 {
-    font-family: var(--font-head);
-    font-size: 32px;
-    margin: 0 0 8px;
-  }
-  .view-header p {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 999px;
+    background: var(--surface-2); border: 1px solid var(--border);
     color: var(--muted);
-    margin: 0;
+    font-size: 12px; font-weight: 500; white-space: nowrap;
   }
-  
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 24px;
-    margin-bottom: 40px;
-  }
+  #live-indicator { background: var(--green-soft); border-color: rgba(52, 211, 153, 0.3); color: var(--green); font-weight: 600; letter-spacing: 0.04em; }
+  #live-indicator.offline { background: var(--red-soft); border-color: rgba(248, 113, 113, 0.3); color: var(--red); }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 0 currentColor; animation: pulse-ring 2s ease-out infinite; }
+  #live-indicator.offline .pulse { animation: none; }
+  @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.6); } 70%, 100% { box-shadow: 0 0 0 8px rgba(52, 211, 153, 0); } }
+
+  .content-scroll { flex: 1; padding: 32px; width: 100%; max-width: 1280px; margin: 0 auto; }
+  .view-header { margin-bottom: 24px; }
+  .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin: 0 0 6px; }
+  .view-header h1 { font-size: 28px; line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 6px; }
+  .view-header p { color: var(--muted); margin: 0; max-width: 70ch; }
+
+  /* ---------- Tarjetas ---------- */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px; }
   .stat-card {
-    background: var(--card-bg);
+    background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 24px;
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    min-width: 0;
   }
-  .stat-card .label { color: var(--muted); font-size: 13px; font-weight: 500; margin-bottom: 12px; display: block; }
-  .stat-card .value { font-family: var(--font-head); font-size: 28px; font-weight: 700; margin-bottom: 8px; display: block; }
-  .stat-card .trend { font-size: 12px; display: flex; align-items: center; gap: 4px; }
+  .stat-card .label { display: block; color: var(--muted); font-size: 13px; font-weight: 500; margin-bottom: 8px; }
+  .stat-card .value { display: block; font-size: 26px; font-weight: 600; line-height: 1.2; margin-bottom: 6px; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+  .stat-card .value.up { color: var(--green); }
+  .stat-card .value.down { color: var(--red); }
+  .stat-card .trend { display: block; font-size: 12.5px; color: var(--muted); }
   .trend.up { color: var(--green); }
   .trend.down { color: var(--red); }
-  
-  .data-section {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    overflow: hidden;
-  }
-  .section-header {
-    padding: 24px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .section-header h2 { font-family: var(--font-head); font-size: 20px; margin: 0; }
-  
-  .controls { display: flex; gap: 12px; }
-  .btn-filter {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 8px 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: 0.2s;
-  }
-  .btn-filter:hover { background: rgba(255,255,255,0.1); }
-  .btn-filter[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
-  
-  /* Table Styles */
-  .market-table { width: 100%; border-collapse: collapse; text-align: left; }
-  .market-table th { padding: 16px 24px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 13px; }
-  .market-table td { padding: 16px 24px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-  .market-table tr:last-child td { border-bottom: none; }
-  .market-table tr:hover { background: rgba(255,255,255,0.02); cursor: pointer; }
-  
-  .furni-cell { display: flex; align-items: center; gap: 12px; }
-  .furni-icon { width: 40px; height: 40px; background: rgba(255,255,255,0.05); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
-  .furni-name { font-weight: 600; display: block; }
-  .furni-key { color: var(--muted); font-size: 11px; }
-  
-  .spark { display: block; }
-  @media (max-width: 760px) { .col-spark { display: none; } }
-  .price-val { font-family: var(--font-head); font-weight: 700; font-size: 16px; }
-  .delta-pill { display: inline-flex; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
-  .delta-pill.down { background: rgba(16, 185, 129, 0.1); color: var(--green); }
-  .delta-pill.up { background: rgba(239, 68, 68, 0.1); color: var(--red); }
-  .delta-pill.flat { background: rgba(255, 255, 255, 0.05); color: var(--muted); }
+  .stat-card.accent { border-color: rgba(245, 184, 61, 0.3); background: linear-gradient(180deg, var(--accent-soft), var(--surface) 70%); }
 
-  /* Detail Overlay */
-  .overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    pointer-events: none;
-    transition: background 0.3s;
+  .data-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .section-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; flex-wrap: wrap; gap: 12px;
+    justify-content: space-between; align-items: center;
   }
-  .overlay.active { background: rgba(0,0,0,0.6); pointer-events: auto; }
+  .section-header h2 { font-size: 17px; font-weight: 600; margin: 0; }
+
+  /* Controles segmentados */
+  .controls { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; }
+  .btn-filter {
+    min-height: 36px; padding: 6px 14px;
+    background: transparent; border: none; border-radius: 8px;
+    color: var(--muted); font-size: 13.5px; font-weight: 500;
+    cursor: pointer;
+    transition: color .2s, background-color .2s;
+  }
+  .btn-filter:hover { color: var(--text); background: var(--surface-3); }
+  .btn-filter[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+  /* ---------- Tablas ---------- */
+  .market-table { width: 100%; border-collapse: collapse; text-align: left; }
+  .market-table th {
+    position: sticky; top: 0;
+    padding: 11px 20px;
+    background: var(--surface);
+    color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .market-table td { padding: 12px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .market-table tbody tr:last-child td { border-bottom: none; }
+  .market-table tbody tr { cursor: pointer; transition: background-color .15s; }
+  .market-table tbody tr:hover { background: var(--surface-2); }
+  .market-table tbody tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--surface-2); }
+  .market-table th.r, .market-table td.r { text-align: right; }
+
+  .furni-cell { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .furni-icon {
+    width: 40px; height: 40px; flex-shrink: 0;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+    display: grid; place-items: center;
+  }
+  .furni-icon img { max-width: 32px; max-height: 32px; image-rendering: pixelated; }
+  .furni-name { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 28ch; }
+  .furni-key { display: block; color: var(--faint); font-size: 12px; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 28ch; }
+
+  .spark { display: block; }
+  .price-val { font-weight: 500; font-size: 15px; white-space: nowrap; }
+  .delta-pill { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 6px; font-family: var(--mono); font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .delta-pill.down { background: var(--green-soft); color: var(--green); }
+  .delta-pill.up { background: var(--red-soft); color: var(--red); }
+  .delta-pill.flat { background: var(--surface-3); color: var(--muted); }
+
+  .more-btn {
+    display: block; width: 100%; min-height: 48px;
+    background: transparent; border: none; border-top: 1px solid var(--border);
+    color: var(--accent); font-weight: 600;
+    cursor: pointer; transition: background-color .2s;
+  }
+  .more-btn:hover { background: var(--surface-2); }
+
+  /* ---------- Panel de detalle ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: var(--z-overlay);
+    display: flex; justify-content: flex-end;
+    pointer-events: none;
+    background: rgba(2, 4, 10, 0);
+    transition: background-color .25s;
+  }
+  .overlay.active { background: rgba(2, 4, 10, 0.65); pointer-events: auto; }
   .detail-panel {
-    width: 600px;
-    height: 100%;
-    background: var(--sidebar-bg);
+    width: min(640px, 100%); height: 100%;
+    background: var(--surface);
     border-left: 1px solid var(--border);
+    padding: 28px;
+    overflow-y: auto; overscroll-behavior: contain;
     transform: translateX(100%);
-    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    display: flex;
-    flex-direction: column;
-    padding: 40px;
-    overflow-y: auto;
+    transition: transform .3s var(--ease);
   }
   .overlay.active .detail-panel { transform: translateX(0); }
-  
-  .detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
-  .close-btn { background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 8px; border-radius: 50%; transition: 0.2s; }
-  .close-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
-  
-  .chart-container {
-    width: 100%;
-    height: 250px;
-    margin-bottom: 32px;
-    position: relative;
+  .detail-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 24px; }
+  .detail-title { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .detail-title .furni-icon { width: 56px; height: 56px; border-radius: 12px; }
+  .detail-title .furni-icon img { max-width: 44px; max-height: 44px; }
+  #detail-name { margin: 0; font-size: 22px; line-height: 1.25; letter-spacing: -0.01em; }
+  #detail-key { color: var(--muted); font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+  .close-btn {
+    width: 44px; height: 44px; flex-shrink: 0;
+    display: grid; place-items: center;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
+    color: var(--muted); cursor: pointer;
+    transition: color .2s, background-color .2s;
   }
-  canvas { width: 100% !important; height: 100% !important; }
+  .close-btn:hover { color: var(--text); background: var(--surface-3); }
+
+  .detail-panel .stats-grid { grid-template-columns: 1fr 1fr; margin-bottom: 20px; }
+  .panel-heading { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin: 8px 0 12px; }
+  .panel-heading h2 { font-size: 16px; font-weight: 600; margin: 0; }
+  .chart-container {
+    position: relative;
+    width: 100%; height: 260px;
+    margin-bottom: 24px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  canvas { width: 100% !important; height: 100% !important; display: block; }
   #chart { cursor: crosshair; touch-action: pan-y; }
   .chart-tip {
-    position: absolute;
-    pointer-events: none;
-    background: rgba(10, 12, 31, 0.95);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 10px;
-    font-size: 12px;
-    line-height: 1.6;
-    white-space: nowrap;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    position: absolute; pointer-events: none;
+    background: rgba(13, 19, 32, 0.96);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    padding: 8px 11px;
+    font-size: 12.5px; line-height: 1.6; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
   }
-  
-  /* Budget & Radar Views */
+  .radar-box { background: var(--accent-soft); border-color: rgba(245, 184, 61, 0.3); }
+  .radar-box .label { color: var(--accent); }
+  .radar-box p { margin: 6px 0 10px; }
+  .radar-box ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .info-row {
+    display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 12px 16px; font-size: 14px;
+  }
+
+  /* ---------- Vistas ---------- */
   .view-content { display: none; }
-  .view-content.active { display: block; }
-  
-  .radar-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-  .radar-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
-  
-  .budget-form { background: var(--card-bg); border: 1px solid var(--border); border-radius: 20px; padding: 32px; margin-bottom: 32px; }
-  .form-group { margin-bottom: 24px; }
-  .form-label { display: block; margin-bottom: 8px; color: var(--muted); font-weight: 500; }
-  .form-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; color: var(--text); font-family: inherit; }
-  .btn-submit { background: var(--accent); color: white; border: none; padding: 14px 28px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-  .btn-submit:hover { background: var(--accent-hover); }
+  .view-content.active { display: block; animation: view-in .25s ease-out; }
+  @keyframes view-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-  /* Mobile */
-  @media (max-width: 1024px) {
-    .sidebar { width: 80px; padding: 24px 12px; }
-    .logo span, .nav-item span { display: none; }
-    .logo { justify-content: center; }
-    .nav-item { justify-content: center; }
-    .detail-panel { width: 100%; }
+  .radar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .radar-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px; cursor: pointer;
+    transition: border-color .2s, background-color .2s;
   }
+  .radar-card:hover { border-color: rgba(245, 184, 61, 0.4); background: var(--surface-2); }
+  .radar-card .label { display: block; font-size: 12px; color: var(--muted); }
+  .radar-card .value { display: block; font-size: 24px; font-weight: 600; }
+  .radar-card .trend { font-size: 12.5px; color: var(--muted); }
+  .radar-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { font-size: 12px; padding: 3px 8px; border-radius: 6px; background: var(--surface-3); color: var(--muted); }
+  .radar-grid > .empty { grid-column: 1 / -1; }
 
-  /* Utility */
-  .empty { padding: 60px; text-align: center; color: var(--muted); }
+  .budget-form { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 24px; max-width: 640px; }
+  .form-group { margin-bottom: 20px; }
+  .form-label { display: block; margin-bottom: 8px; color: var(--muted); font-weight: 500; font-size: 14px; }
+  .form-input {
+    width: 100%; min-height: 46px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 10px 14px; font-family: var(--mono); font-size: 16px;
+    outline: none; transition: border-color .2s, box-shadow .2s;
+  }
+  .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .btn-submit {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 46px; padding: 10px 22px;
+    background: var(--accent); color: var(--accent-ink);
+    border: none; border-radius: var(--radius-sm);
+    font-weight: 600; text-decoration: none;
+    cursor: pointer; transition: background-color .2s;
+  }
+  .btn-submit:hover { background: var(--accent-strong); }
+
+  .alert-card { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+  .alert-card h3 { margin: 0 0 4px; font-size: 16px; }
+  .alert-card p { margin: 0; color: var(--muted); font-size: 14px; }
+
+  .empty { padding: 48px 24px; text-align: center; color: var(--muted); }
+  .empty strong { display: block; color: var(--text); font-size: 16px; margin-bottom: 6px; }
   .hidden { display: none !important; }
   [hidden] { display: none !important; }
+
+  /* ---------- Responsivo ---------- */
+  @media (max-width: 1024px) {
+    :root { --sidebar-width: 76px; }
+    .logo { justify-content: center; padding: 6px 0 22px; }
+    .logo-text, .nav-item span, .nav-label, .sidebar-footer label { display: none; }
+    .nav-item { justify-content: center; padding: 10px; }
+    .sidebar-footer .hotel-select { padding: 8px 4px; font-size: 12px; }
+    .col-wide { display: none; }
+  }
+  @media (max-width: 767px) {
+    body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+    /* la barra lateral pasa a ser una barra inferior */
+    .sidebar {
+      position: fixed; top: auto; bottom: 0; left: 0; right: 0;
+      width: 100%; height: auto;
+      flex-direction: row; align-items: center;
+      padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+      border-right: none; border-top: 1px solid var(--border);
+      background: rgba(13, 19, 32, 0.96);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    }
+    .logo, .sidebar-footer { display: none; }
+    .nav-group { flex-direction: row; width: 100%; justify-content: space-around; }
+    .nav-item { flex-direction: column; gap: 2px; padding: 6px 4px; min-height: 52px; font-size: 11px; width: auto; flex: 1; }
+    .nav-item span { display: block; }
+    .top-bar { padding: 0 16px; }
+    .top-actions #meta, .search-wrapper kbd { display: none; }
+    .content-scroll { padding: 20px 16px; }
+    .view-header h1 { font-size: 24px; }
+    .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat-card { padding: 14px; }
+    .stat-card .value { font-size: 20px; }
+    .market-table th, .market-table td { padding: 10px 12px; }
+    .col-spark, .col-hide-sm { display: none; }
+    .furni-name, .furni-key { max-width: 18ch; }
+    .detail-panel { padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); border-left: none; }
+    .section-header { padding: 14px 16px; }
+  }
+  @media (max-width: 340px) {
+    .stats-grid { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+  }
 </style>
 </head>
 <body>
 
-<!-- Habbo Market Hero -->
-<section class="nexora-hero" id="hero">
-  <div class="nexora-nav">
-    <div class="nexora-nav-inner">
-      <a href="#" class="nexora-nav-logo">Habbo Market</a>
-      <div class="nexora-nav-links">
-        <a href="#dashboard-root" class="nexora-nav-link">Mercado</a>
-        <a href="#radar-view" class="nexora-nav-link">Radar</a>
-        <a href="#live-view" class="nexora-nav-link">En Vivo</a>
-      </div>
-      <button onclick="document.getElementById('dashboard-root').scrollIntoView({behavior:'smooth'})" class="btn-nexora btn-nexora-primary" style="padding: 8px 16px; border-radius: 8px; font-size: 13px;">Entrar</button>
-    </div>
-  </div>
-  <video class="nexora-video" autoplay loop muted playsinline>
-    <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260813_092641_de52eb87-daf2-41db-92cb-7a56eae012a5.mp4" type="video/mp4">
-  </video>
-  <div class="nexora-overlay"></div>
-  
-  <div class="nexora-content">
-    <div class="nexora-badge">Habbo Market — En Vivo</div>
-    <h1 class="nexora-title">
-      <span>Seguimiento Inteligente</span>
-      <span>Diseñado para <i>Ganar.</i></span>
-    </h1>
-    <p class="nexora-desc">
-      HabboTracker potencia a los comerciantes modernos con automatización inteligente, modelos predictivos y datos en tiempo real del mercadillo.
-    </p>
-    <div class="nexora-actions">
-      <button onclick="document.getElementById('dashboard-root').scrollIntoView({behavior:'smooth'})" class="btn-nexora btn-nexora-primary">Abrir Panel</button>
-      <a href="https://habbomarket.live" class="btn-nexora btn-nexora-outline">Ver Soluciones</a>
-    </div>
-
-    <div class="nexora-stats" style="margin-top: 60px; display: flex; gap: 40px; justify-content: center; animation: fade-up 1s ease-out 0.8s both;">
-      <div style="text-align: left;">
-        <span style="display: block; font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 1px; margin-bottom: 4px;">Hotel Activo</span>
-        <span id="hero-hotel-nexora" style="font-size: 18px; font-weight: 600;">—</span>
-      </div>
-      <div style="text-align: left;">
-        <span style="display: block; font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 1px; margin-bottom: 4px;">Furnis Rastreados</span>
-        <span id="hero-count-nexora" style="font-size: 18px; font-weight: 600;">—</span>
-      </div>
-      <div style="text-align: left;">
-        <span style="display: block; font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 1px; margin-bottom: 4px;">Última Sync</span>
-        <span id="hero-sync-nexora" style="font-size: 18px; font-weight: 600;">—</span>
-      </div>
-    </div>
-  </div>
-</section>
-
 <div id="dashboard-root">
-<aside class="sidebar">
-  <a href="/" class="logo">
-    <div class="logo-icon">H</div>
-    <span>HabboTracker</span>
+<aside class="sidebar" aria-label="Navegación">
+  <a href="./" class="logo">
+    <div class="logo-icon" aria-hidden="true">H</div>
+    <span class="logo-text">HabboTracker<small id="hotel-sub">Mercadillo</small></span>
   </a>
-  
+
+  <div class="nav-label">Secciones</div>
   <nav class="nav-group">
-    <button class="nav-item active" data-view="market">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+    <button class="nav-item active" data-view="market" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
       <span>Mercado</span>
     </button>
     <button class="nav-item" data-view="radar">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-      <span>Radar AI</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+      <span>Radar</span>
     </button>
     <button class="nav-item" data-view="live">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
       <span>En Vivo</span>
     </button>
     <button class="nav-item" data-view="launches">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
-      <span>Lanzamientos</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z"></path></svg>
+      <span>Nuevos</span>
     </button>
     <button class="nav-item" data-view="budget">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="14" rx="2"></rect><path d="M16 13h2"></path><path d="M2 10h20"></path><path d="M6 6V4h12v2"></path></svg>
       <span>Inversor</span>
     </button>
   </nav>
-  
+
   <div class="sidebar-footer">
-    <select id="hotel-switch" class="hotel-select" style="width:100%"></select>
+    <label for="hotel-switch">Hotel</label>
+    <select id="hotel-switch" class="hotel-select" aria-label="Cambiar de hotel"></select>
   </div>
 </aside>
 
 <main class="main-content">
   <header class="top-bar">
-    <div class="search-wrapper">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-      <input type="text" id="q" placeholder="Buscar furnis por nombre o código...">
+    <div class="search-wrapper" role="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <label for="q" class="sr-only">Buscar furnis</label>
+      <input type="search" id="q" placeholder="Buscar furni o código" autocomplete="off" spellcheck="false">
+      <kbd aria-hidden="true">/</kbd>
     </div>
-    
+
     <div class="top-actions">
-      <div id="live-indicator" class="status-pill" hidden>
-        <span class="pulse"></span>
+      <div id="live-indicator" class="status-pill" role="status" hidden>
+        <span class="pulse" aria-hidden="true"></span>
         <span>EN VIVO</span>
       </div>
-      <div class="status-pill" id="meta">Cargando...</div>
+      <div class="status-pill" id="meta">Cargando…</div>
     </div>
   </header>
-  
+
   <div class="content-scroll">
-    <!-- Market View -->
-    <div id="market-view" class="view-content active">
+    <!-- Mercado -->
+    <section id="market-view" class="view-content active" aria-labelledby="market-h">
       <div class="view-header">
-        <h1>Dashboard</h1>
-        <p id="market-title">Analizando el mercado global de Habbo</p>
+        <p class="eyebrow" id="hotel-name">Habbo</p>
+        <h1 id="market-h">Mercado</h1>
+        <p id="market-title">Cargando el mercado…</p>
       </div>
 
       <div id="alerts-container"></div>
-      
+
       <div class="stats-grid">
         <div class="stat-card">
-          <span class="label">Total Activos</span>
+          <span class="label">Furnis rastreados</span>
           <span class="value" id="hero-count">—</span>
           <span class="trend" id="stat-active">—</span>
         </div>
-        <div class="stat-card">
-          <span class="label">Hotel Activo</span>
-          <span class="value" id="hotel-name">.ES</span>
-          <span class="trend" id="stat-updated">—</span>
-        </div>
-        <div class="stat-card">
+        <div class="stat-card accent">
           <span class="label" title="Furnis más de 15% abajo de su precio justo">Oportunidades</span>
-          <span class="value" id="opportunity-count">0</span>
+          <span class="value" id="opportunity-count">—</span>
           <span class="trend" id="stat-radar">—</span>
         </div>
         <div class="stat-card">
-          <span class="label">Precios en Vivo</span>
+          <span class="label">Precios en vivo</span>
           <span class="value" id="stat-live">—</span>
           <span class="trend" id="stat-live-detail">—</span>
         </div>
+        <div class="stat-card">
+          <span class="label">Datos del índice</span>
+          <span class="value" id="stat-updated-value">—</span>
+          <span class="trend" id="stat-updated">—</span>
+        </div>
       </div>
-      
+
       <div class="data-section">
         <div class="section-header">
-          <h2>Resumen del Mercado</h2>
-          <div class="controls" id="sort">
-            <button class="btn-filter" data-sort="sold" aria-pressed="true">Más Vendidos</button>
-            <button class="btn-filter" data-sort="delta">Más Baratos</button>
+          <h2>Resumen del mercado</h2>
+          <div class="controls" id="sort" role="group" aria-label="Ordenar">
+            <button class="btn-filter" data-sort="sold" aria-pressed="true">Más vendidos</button>
+            <button class="btn-filter" data-sort="delta">Más baratos</button>
             <button class="btn-filter" data-sort="price">Precio</button>
           </div>
         </div>
-        <table class="market-table">
-          <thead>
-            <tr>
-              <th>Furni</th>
-              <th>Precio</th>
-              <th>Justo</th>
-              <th class="col-spark">30 días</th>
-              <th>Trend</th>
-              <th>Mensual</th>
-            </tr>
-          </thead>
-          <tbody id="list">
-            <!-- Items injected via JS -->
-          </tbody>
-        </table>
-        <div id="more" class="empty" style="cursor:pointer; padding:20px; font-weight:600">Ver más resultados</div>
+        <div class="table-scroll">
+          <table class="market-table">
+            <thead>
+              <tr>
+                <th scope="col">Furni</th>
+                <th scope="col" class="r">Precio</th>
+                <th scope="col" class="r col-hide-sm">Justo</th>
+                <th scope="col" class="col-spark">30 días</th>
+                <th scope="col" class="r">vs justo</th>
+                <th scope="col" class="r col-hide-sm">Ventas/mes</th>
+              </tr>
+            </thead>
+            <tbody id="list"></tbody>
+          </table>
+        </div>
+        <button type="button" id="more" class="more-btn">Ver más resultados</button>
       </div>
-    </div>
+    </section>
 
-    <!-- Radar View -->
-    <div id="radar-view" class="view-content">
+    <!-- Radar -->
+    <section id="radar-view" class="view-content" aria-labelledby="radar-h">
       <div class="view-header">
-        <h1>Radar AI</h1>
-        <p>Predicciones y análisis de tendencias algorítmicas</p>
+        <p class="eyebrow">Predicción</p>
+        <h1 id="radar-h">Radar</h1>
+        <p>Furnis cuyas señales solían venir antes de una subida. Se prueba contra el último año y solo recomienda si le gana al mercado con claridad.</p>
       </div>
       <div id="radar" class="radar-grid"></div>
-    </div>
+    </section>
 
-    <!-- Live View -->
-    <div id="live-view" class="view-content">
+    <!-- En vivo -->
+    <section id="live-view" class="view-content" aria-labelledby="live-h">
       <div class="view-header">
-        <h1>Transmisión en Vivo</h1>
-        <p>Datos en tiempo real directo desde el mercadillo</p>
+        <p class="eyebrow">Tiempo real</p>
+        <h1 id="live-h">En vivo</h1>
+        <p>Los precios más recientes leídos del Mercadillo.</p>
       </div>
       <div id="live-list" class="data-section">
-        <table class="market-table">
-          <thead>
-            <tr>
-              <th>Furni</th>
-              <th>Precio Vivo</th>
-              <th>Ofertas</th>
-              <th>Edad</th>
-            </tr>
-          </thead>
-          <tbody id="live-rows"></tbody>
-        </table>
+        <div class="table-scroll">
+          <table class="market-table">
+            <thead>
+              <tr>
+                <th scope="col">Furni</th>
+                <th scope="col" class="r">Precio</th>
+                <th scope="col" class="r">Ofertas</th>
+                <th scope="col" class="r">Leído</th>
+              </tr>
+            </thead>
+            <tbody id="live-rows"></tbody>
+          </table>
+        </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Launches View -->
-    <div id="launches-view" class="view-content">
+    <!-- Lanzamientos -->
+    <section id="launches-view" class="view-content" aria-labelledby="launches-h">
       <div class="view-header">
-        <h1>Lanzamientos</h1>
-        <p>Nuevos furnis detectados recientemente</p>
+        <p class="eyebrow">Últimos 30 días</p>
+        <h1 id="launches-h">Lanzamientos</h1>
+        <p>Furnis nuevos y cuánto han bajado desde su máximo.</p>
       </div>
       <div id="launches" class="data-section"></div>
-    </div>
+    </section>
 
-    <!-- Budget View -->
-    <div id="budget-view" class="view-content">
+    <!-- Inversor -->
+    <section id="budget-view" class="view-content" aria-labelledby="budget-h">
       <div class="view-header">
-        <h1>Inversor Inteligente</h1>
-        <p>Optimiza tus créditos con el mejor ROI</p>
+        <p class="eyebrow">Presupuesto</p>
+        <h1 id="budget-h">Inversor</h1>
+        <p>Arma una lista de compras con tus créditos: furnis abajo de su precio justo que se revenden rápido.</p>
       </div>
-      <div class="budget-form">
+      <form class="budget-form" id="budget-form" onsubmit="return false">
         <div class="form-group">
-          <label class="form-label">Tu Presupuesto (Créditos)</label>
-          <input type="number" id="budget" class="form-input" placeholder="Ej: 500">
+          <label class="form-label" for="budget">Tu presupuesto (créditos)</label>
+          <input type="number" id="budget" class="form-input" placeholder="Ej. 500" min="1" inputmode="numeric">
         </div>
         <div class="form-group">
-          <label class="form-label">Tiempo máximo de reventa</label>
-          <div class="controls" id="budget-days">
-            <button class="btn-filter" data-days="7" aria-pressed="true">7 Días</button>
-            <button class="btn-filter" data-days="15">15 Días</button>
-            <button class="btn-filter" data-days="30">30 Días</button>
+          <span class="form-label" id="budget-days-label">Tiempo máximo de reventa</span>
+          <div class="controls" id="budget-days" role="group" aria-labelledby="budget-days-label">
+            <button type="button" class="btn-filter" data-days="7" aria-pressed="true">7 días</button>
+            <button type="button" class="btn-filter" data-days="15">15 días</button>
+            <button type="button" class="btn-filter" data-days="30">30 días</button>
           </div>
         </div>
-        <button id="budget-go" class="btn-submit">Calcular Inversión</button>
-      </div>
-      <div id="budget-out"></div>
-    </div>
+        <button type="submit" id="budget-go" class="btn-submit">Calcular inversión</button>
+      </form>
+      <div id="budget-out" aria-live="polite"></div>
+    </section>
   </div>
 </main>
 
-<!-- Detail Overlay -->
-<div class="overlay" id="overlay">
-  <div class="detail-panel">
+<!-- Detalle de un furni -->
+<div class="overlay" id="overlay" inert>
+  <div class="detail-panel" role="dialog" aria-modal="true" aria-labelledby="detail-name">
     <div class="detail-header">
-      <div id="detail-meta">
-        <h2 id="detail-name" style="margin:0; font-family:var(--font-head); font-size:28px;">Furni Name</h2>
-        <span id="detail-key" style="color:var(--muted); font-family:var(--mono);">code_key</span>
+      <div class="detail-title">
+        <div class="furni-icon"><img id="detail-icon" alt="" style="visibility:hidden"></div>
+        <div style="min-width:0">
+          <h2 id="detail-name">Furni</h2>
+          <span id="detail-key">—</span>
+        </div>
       </div>
-      <button class="close-btn" id="back">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      <button class="close-btn" id="back" aria-label="Cerrar detalle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
     </div>
-    
-    <div class="stats-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 32px;">
+
+    <div class="stats-grid">
       <div class="stat-card">
-        <span class="label">Precio Actual</span>
+        <span class="label">Precio actual</span>
         <span class="value" id="detail-price">—</span>
       </div>
       <div class="stat-card">
-        <span class="label">Precio Justo</span>
+        <span class="label">Precio justo</span>
         <span class="value" id="detail-fair">—</span>
       </div>
     </div>
 
-    <div class="section-header" style="padding-left:0; border-bottom:none; margin-bottom:12px;">
-      <h2>Historial de Precios</h2>
-      <div class="controls" id="range">
+    <div class="panel-heading">
+      <h2>Historial de precios</h2>
+      <div class="controls" id="range" role="group" aria-label="Periodo">
         <button class="btn-filter" data-days="7" aria-pressed="true">7d</button>
         <button class="btn-filter" data-days="30">30d</button>
         <button class="btn-filter" data-days="90">90d</button>
@@ -795,23 +640,23 @@
         <button class="btn-filter" data-days="0">Todo</button>
       </div>
     </div>
-    
+
     <div class="chart-container">
-      <canvas id="chart"></canvas>
+      <canvas id="chart" role="img" aria-label="Gráfica del precio medio por día"></canvas>
       <div id="chart-tip" class="chart-tip" hidden></div>
     </div>
 
-    <div id="radar-box" class="stat-card" style="background:rgba(124, 58, 237, 0.05); border-color:rgba(124, 58, 237, 0.2);" hidden>
-      <span class="label" style="color:var(--accent)">Análisis AI</span>
-      <p style="margin:12px 0; line-height:1.6;"><strong></strong></p>
-      <ul style="margin:0; padding-left:20px; color:var(--muted);"></ul>
+    <div id="radar-box" class="stat-card radar-box" hidden>
+      <span class="label">Radar</span>
+      <p><strong></strong></p>
+      <ul></ul>
     </div>
-    
-    <div id="detail-extra" style="margin-top:32px;"></div>
+
+    <div id="detail-extra" style="margin-top:20px;"></div>
   </div>
 </div>
 
-</div> <!-- End dashboard-root -->
+</div>
 
 <script>
 (function () {
@@ -915,18 +760,18 @@
   function rowHtml(s) {
     const deltaClass = !s.delta ? "flat" : s.delta < -0.05 ? "down" : s.delta > 0.05 ? "up" : "flat";
     const deltaText = s.delta ? pct(s.delta) : "est.";
-    return `<tr data-key="${s.key}">
+    return `<tr data-key="${s.key}" tabindex="0">
       <td>
         <div class="furni-cell">
-          <div class="furni-icon"><img ${iconAttrs(s)} loading="lazy"></div>
-          <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div>
+          <div class="furni-icon"><img ${iconAttrs(s)} alt="" loading="lazy" width="32" height="32"></div>
+          <div style="min-width:0"><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div>
         </div>
       </td>
-      <td><div class="price-val">${s.price ? fmt(s.price) : "—"}</div></td>
-      <td><div class="price-val" style="opacity:0.6">${s.fair ? fmt(s.fair) : "—"}</div></td>
+      <td class="r"><span class="price-val">${s.price ? fmt(s.price) : "—"}</span></td>
+      <td class="r col-hide-sm"><span class="price-val" style="color:var(--muted)">${s.fair ? fmt(s.fair) : "—"}</span></td>
       <td class="col-spark">${sparkSvg(s.spark)}</td>
-      <td><div class="delta-pill ${deltaClass}">${deltaText}</div></td>
-      <td><div style="font-weight:600">${fmt(s.sold)}</div><div style="font-size:10px; color:var(--muted)">v/mes</div></td>
+      <td class="r"><span class="delta-pill ${deltaClass}">${deltaText}</span></td>
+      <td class="r col-hide-sm"><span class="num">${fmt(s.sold)}</span></td>
     </tr>`;
   }
 
@@ -994,12 +839,12 @@
     }
 
     $("radar").innerHTML = picks.slice(0, 12).map((s) => {
-      return `<div class="radar-card" style="cursor:pointer" onclick="location.hash='${s.key}'">
-        <div class="furni-cell" style="margin-bottom:16px">
-          <div class="furni-icon"><img ${iconAttrs(s)}></div>
-          <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div>
+      return `<div class="radar-card" role="link" tabindex="0" onclick="location.hash='${s.key}'">
+        <div class="furni-cell" style="margin-bottom:14px">
+          <div class="furni-icon"><img ${iconAttrs(s)} alt=""></div>
+          <div style="min-width:0"><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div>
         </div>
-        <div class="label">Crecimiento Estimado</div>
+        <div class="label">Subida estimada</div>
         <div class="value" style="color:var(--green)">${pct1(s.expected)}</div>
         <div class="trend">en ${prediction.horizon_days} días</div>
         <div class="radar-tags" style="margin-top:12px">
@@ -1012,23 +857,25 @@
   // ---- Live View ----
   function renderLiveTab() {
     if (!live || !live.items) {
-       $("live-rows").innerHTML = `<tr><td colspan="4" class="empty">Esperando datos en vivo...</td></tr>`;
+       $("live-rows").innerHTML = `<tr><td colspan="4" class="empty">Esperando datos en vivo…</td></tr>`;
        return;
     }
     const entries = Object.entries(live.items)
       .map(([k, v]) => ({ key: k, price: v[0], offers: v[1], age: v[2] }))
       .sort((a, b) => a.age - b.age);
     
+    const lag = Math.max(0, Math.round(Date.now() / 1000 - (live.t || 0)));
     $("live-rows").innerHTML = entries.slice(0, 50).map((e) => {
-      const s = all.find(x => x.key === e.key) || { name: "Furni Desconocido", c: e.key.split(":")[1] };
-      return `<tr onclick="location.hash='${e.key}'">
+      const s = all.find(x => x.key === e.key) || { name: "Furni desconocido", c: e.key.split(":")[1] };
+      const secs = e.age + lag;
+      return `<tr tabindex="0" onclick="location.hash='${e.key}'">
         <td><div class="furni-cell">
-          <div class="furni-icon"><img ${iconAttrs(s)}></div>
-          <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c || e.key.split(":")[1])}</span></div>
+          <div class="furni-icon"><img ${iconAttrs(s)} alt=""></div>
+          <div style="min-width:0"><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c || e.key.split(":")[1])}</span></div>
         </div></td>
-        <td><div class="price-val">${e.price || "—"}</div></td>
-        <td>${e.offers != null ? e.offers : "—"}</td>
-        <td>hace ${e.age}s</td>
+        <td class="r"><span class="price-val">${e.price ? fmt(e.price) : "—"}</span></td>
+        <td class="r num">${e.offers != null ? fmt(e.offers) : "—"}</td>
+        <td class="r num" style="color:var(--muted)">${secs < 60 ? secs + " s" : Math.round(secs / 60) + " min"}</td>
       </tr>`;
     }).join("");
   }
@@ -1040,7 +887,7 @@
       $("launches").innerHTML = `<div class="empty"><strong>Sin lanzamientos recientes</strong></div>`;
       return;
     }
-    $("launches").innerHTML = `<table class="market-table"><thead><tr><th>Furni</th><th>Fecha</th><th>Ventas</th><th>Estado</th></tr></thead>
+    $("launches").innerHTML = `<div class="table-scroll"><table class="market-table"><thead><tr><th scope="col">Furni</th><th scope="col">Salió</th><th scope="col" class="r col-hide-sm">Ventas/mes</th><th scope="col" class="r">Estado</th></tr></thead>
       <tbody>${rows.map(s => {
         const age = daysAgo(s.launched);
         const when = age <= 0 ? "Hoy" : age === 1 ? "Ayer" : `${age}d`;
@@ -1050,13 +897,13 @@
           const d = (s.price - peak) / peak;
           state = d < -0.02 ? `<span class="delta-pill down">−${Math.abs(Math.round(d * 100))}% vs máx</span>` : `<span class="delta-pill up">en su máximo</span>`;
         }
-        return `<tr onclick="location.hash='${s.key}'">
-          <td><div class="furni-cell"><div class="furni-icon"><img ${iconAttrs(s)}></div><div>${esc(s.name)}</div></div></td>
-          <td>${when}</td>
-          <td>${fmt(s.sold)}</td>
-          <td>${state}</td>
+        return `<tr tabindex="0" onclick="location.hash='${s.key}'">
+          <td><div class="furni-cell"><div class="furni-icon"><img ${iconAttrs(s)} alt=""></div><div style="min-width:0"><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div></div></td>
+          <td style="white-space:nowrap">${when}</td>
+          <td class="r num col-hide-sm">${fmt(s.sold)}</td>
+          <td class="r">${state}</td>
         </tr>`;
-      }).join("")}</tbody></table>`;
+      }).join("")}</tbody></table></div>`;
   }
 
   // ---- Detail & Chart ----
@@ -1093,7 +940,7 @@
     if (!current) return;
     const data = chartData();
     if (data.length < 2) {
-      ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.textAlign = "center"; ctx.font = "12px Inter, sans-serif";
+      ctx.fillStyle = "#94a3b8"; ctx.textAlign = "center"; ctx.font = "13px 'Fira Sans', sans-serif";
       ctx.fillText(currentHistory ? "Sin ventas suficientes en este periodo" : "Cargando historial…", w / 2, h / 2);
       return;
     }
@@ -1114,20 +961,20 @@
     const getY = (p) => margin.top + chartH - ((p - minP) / (maxP - minP)) * chartH;
 
     // Rejilla y precios
-    ctx.font = "10px Inter, sans-serif";
+    ctx.font = "11px 'Fira Code', monospace";
     ctx.lineWidth = 1;
     ctx.textAlign = "right";
     [0, 0.25, 0.5, 0.75, 1].forEach((f) => {
       const p = minP + f * (maxP - minP), y = getY(p);
-      ctx.strokeStyle = "rgba(255,255,255,0.06)";
+      ctx.strokeStyle = "#1a2436";
       ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(w - margin.right, y); ctx.stroke();
-      ctx.fillStyle = "rgba(255,255,255,0.45)";
+      ctx.fillStyle = "#94a3b8";
       ctx.fillText(fmt(Math.round(p)), margin.left - 8, y + 3);
     });
 
     // Fechas: marcas repartidas por tiempo, no por número de puntos
     ctx.textAlign = "center";
-    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.fillStyle = "#94a3b8";
     const ticks = Math.max(2, Math.min(6, Math.floor(chartW / 80)));
     const span = t1 - t0;
     for (let k = 0; k <= ticks; k++) {
@@ -1135,6 +982,7 @@
       const label = dated
         ? new Date(v).toLocaleDateString("es-MX", span > 200 * DAY ? { month: "short", year: "2-digit", timeZone: "UTC" } : { day: "numeric", month: "short", timeZone: "UTC" })
         : (k === ticks ? "hoy" : "");
+      ctx.textAlign = k === 0 ? "left" : k === ticks ? "right" : "center";   // que la primera y la última no se corten
       ctx.fillText(label, x, h - 14);
     }
 
@@ -1142,7 +990,7 @@
     const maxO = Math.max(0, ...data.map((x) => x.offers || 0));
     if (maxO) {
       const bw = Math.max(1, Math.min(10, (chartW / data.length) * 0.6));
-      ctx.fillStyle = "rgba(255,255,255,0.08)";
+      ctx.fillStyle = "rgba(100,116,139,0.28)";
       data.forEach((d) => {
         if (!d.offers) return;
         const bh = (d.offers / maxO) * chartH * 0.3;
@@ -1154,7 +1002,7 @@
     if (current.fair && current.fair >= minP && current.fair <= maxP) {
       const y = getY(current.fair);
       ctx.save();
-      ctx.setLineDash([4, 4]); ctx.strokeStyle = "rgba(251,191,36,0.6)";
+      ctx.setLineDash([4, 4]); ctx.strokeStyle = "rgba(148,163,184,0.7)";
       ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(w - margin.right, y); ctx.stroke();
       ctx.restore();
     }
@@ -1166,28 +1014,28 @@
     ctx.lineTo(pts[pts.length - 1][0], margin.top + chartH);
     ctx.lineTo(pts[0][0], margin.top + chartH);
     const grad = ctx.createLinearGradient(0, margin.top, 0, margin.top + chartH);
-    grad.addColorStop(0, "rgba(124, 58, 237, 0.2)"); grad.addColorStop(1, "rgba(124, 58, 237, 0)");
+    grad.addColorStop(0, "rgba(245, 184, 61, 0.22)"); grad.addColorStop(1, "rgba(245, 184, 61, 0)");
     ctx.fillStyle = grad; ctx.fill();
 
     ctx.beginPath();
-    ctx.strokeStyle = "#a78bfa"; ctx.lineWidth = 2; ctx.lineJoin = "round";
+    ctx.strokeStyle = "#f5b83d"; ctx.lineWidth = 2; ctx.lineJoin = "round";
     pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
     ctx.stroke();
 
     // Precio más bajo visto ese día
-    ctx.fillStyle = "#10b981";
+    ctx.fillStyle = "#34d399";
     data.forEach((d) => {
       if (d.low) { ctx.beginPath(); ctx.arc(getX(d), getY(d.low), 2.5, 0, Math.PI * 2); ctx.fill(); }
     });
 
     // Leyenda
-    ctx.textAlign = "left"; ctx.font = "11px Inter, sans-serif";
+    ctx.textAlign = "left"; ctx.font = "12px 'Fira Sans', sans-serif";
     let lx = margin.left;
     const legend = (color, text) => { ctx.fillStyle = color; ctx.fillText(text, lx, 12); lx += ctx.measureText(text).width + 14; };
-    legend("#a78bfa", "● Precio medio");
-    if (data.some((x) => x.low)) legend("#10b981", "● Más baja");
-    if (current.fair) legend("rgba(251,191,36,0.9)", "┄ Precio justo");
-    if (maxO) legend("rgba(255,255,255,0.5)", "▮ Ofertas");
+    legend("#f5b83d", "● Precio medio");
+    if (data.some((x) => x.low)) legend("#34d399", "● Más baja");
+    if (current.fair) legend("#94a3b8", "┄ Precio justo");
+    if (maxO) legend("#64748b", "▮ Ofertas");
 
     chartState = { data, pts, margin, chartH, w, h, getY };
     if (hoverIdx != null && hoverIdx < data.length) drawHover(ctx, hoverIdx);
@@ -1197,20 +1045,20 @@
     const { data, pts, margin, chartH, w } = chartState;
     const d = data[i], [x, y] = pts[i];
     ctx.save();
-    ctx.strokeStyle = "rgba(255,255,255,0.25)"; ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(232,236,243,0.3)"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(x, margin.top); ctx.lineTo(x, margin.top + chartH); ctx.stroke();
-    ctx.fillStyle = "#a78bfa"; ctx.strokeStyle = "#0a0c1f"; ctx.lineWidth = 2;
+    ctx.fillStyle = "#f5b83d"; ctx.strokeStyle = "#070b14"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     if (d.low) {
-      ctx.fillStyle = "#10b981";
+      ctx.fillStyle = "#34d399";
       ctx.beginPath(); ctx.arc(x, chartState.getY(d.low), 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
     ctx.restore();
 
     const tip = $("chart-tip");
     const rows = [`<b>${d.t != null ? fmtDate(d.t) : `hace ${data.length - 1 - i} días con ventas`}</b>`,
-      `<span style="color:#a78bfa">Precio medio</span> ${fmt(d.avg)}`];
-    if (d.low) rows.push(`<span style="color:#10b981">Más baja</span> ${fmt(d.low)}`);
+      `<span style="color:var(--accent)">Precio medio</span> <span class="num">${fmt(d.avg)}</span>`];
+    if (d.low) rows.push(`<span style="color:var(--green)">Más baja</span> <span class="num">${fmt(d.low)}</span>`);
     if (d.sold != null) rows.push(`Vendidos ${fmt(d.sold)}`);
     if (d.offers != null) rows.push(`Ofertas ${fmt(d.offers)}`);
     if (current.fair) rows.push(`<span style="color:var(--muted)">vs justo ${pct((d.avg - current.fair) / current.fair)}</span>`);
@@ -1236,20 +1084,28 @@
   $("chart").addEventListener("pointerleave", () => { hoverIdx = null; drawChart(); });
   new ResizeObserver(() => { if (current) drawChart(); }).observe($("chart"));
 
+  let lastFocus = null, openedInPage = false;
   async function route() {
     const k = location.hash.slice(1);
-    if (!k || k === "dashboard-root" || k === "hero") { 
-      $("overlay").classList.remove("active"); 
+    if (!k || k === "dashboard-root" || k === "hero") {
+      const wasOpen = $("overlay").classList.contains("active");
+      $("overlay").classList.remove("active");
+      $("overlay").inert = true;
       document.body.style.overflow = "";
-      current = null; 
+      current = null;
       currentHistory = null;
-      return; 
+      if (wasOpen && lastFocus && document.contains(lastFocus)) lastFocus.focus({ preventScroll: true });
+      return;
     }
     const s = all.find((x) => x.key === k);
     if (!s) return;
     current = s;
     $("detail-name").textContent = s.name;
     $("detail-key").textContent = s.key;
+    const icon = $("detail-icon"), iconSrc = getIcon(s);
+    icon.style.visibility = iconSrc ? "" : "hidden";
+    icon.dataset.alt = getIconAlt(s);
+    if (iconSrc) { icon.referrerPolicy = "no-referrer"; icon.src = iconSrc; } else icon.removeAttribute("src");
     $("detail-price").textContent = s.price ? fmt(s.price) : "—";
     $("detail-fair").textContent = s.fair ? fmt(s.fair) : "—";
     
@@ -1260,23 +1116,28 @@
       const fee = index.fee_pct || 1;
       const net = Math.round(s.fair * (1 - fee/100) - s.price);
       const roi = Math.round((net / s.price) * 100);
-      html += `<div class="stat-card"><span class="label">Beneficio Neto (con fee)</span><span class="value ${net > 0 ? 'up' : 'down'}">${net > 0 ? '+' : ''}${fmt(net)} (${roi}%)</span></div>`;
+      html += `<div class="stat-card"><span class="label">Ganancia si revendes al justo (con comisión)</span><span class="value ${net > 0 ? 'up' : 'down'}">${net > 0 ? '+' : ''}${fmt(net)} (${roi}%)</span></div>`;
     }
     if (s.dr != null) {
-      html += `<div class="stat-card"><span class="label">Liquidez (Días Stock)</span><span class="value">${s.dr} días</span></div>`;
+      html += `<div class="stat-card"><span class="label">Días para vender las ofertas</span><span class="value">${s.dr} días</span></div>`;
     }
     html += `</div>`;
     
     if (s.l && s.h) {
-      html += `<div style="background:rgba(255,255,255,0.03); padding:16px; border-radius:12px; margin-bottom:24px; font-size:13px; display:flex; justify-content:space-between;">
-        <span>Rango Normal: <b>${fmt(s.l)}</b> - <b>${fmt(s.h)}</b></span>
-        <span style="color:var(--muted)">Volumen: <b>${fmt(s.sold)}</b>/mes</span>
+      html += `<div class="info-row">
+        <span>Rango normal: <b class="num">${fmt(s.l)}</b> – <b class="num">${fmt(s.h)}</b></span>
+        <span style="color:var(--muted)">Ventas: <b class="num" style="color:var(--text)">${fmt(s.sold)}</b>/mes</span>
       </div>`;
     }
     extra.innerHTML = html;
 
     document.body.style.overflow = "hidden";
-    $("overlay").classList.add("active");
+    if (!$("overlay").classList.contains("active")) {
+      lastFocus = document.activeElement;
+      $("overlay").inert = false;
+      $("overlay").classList.add("active");
+      $("back").focus({ preventScroll: true });
+    }
     currentHistory = null;   // si no, se veía el historial del furni anterior mientras carga el nuevo
     hoverIdx = null;
     drawChart();
@@ -1301,7 +1162,7 @@
       radar.hidden = false;
     }
   }
-  window.addEventListener("hashchange", route);
+  window.addEventListener("hashchange", () => { openedInPage = !!location.hash.slice(1); route(); });
 
   // ---- Tarjetas de estado (todo sale de los datos, nada fijo) ----
   const STALE_INDEX = 14 * 3600000;   // el recolector corre cada 12 h
@@ -1317,9 +1178,9 @@
     setTrend("stat-active", `${fmt(selling)} con ventas en 30 días`);
 
     const age = Date.now() - new Date(index.updated);
-    setTrend("stat-updated", `Datos ${ago(index.updated)}`, age > STALE_INDEX ? "down" : "up");
+    $("stat-updated-value").textContent = ago(index.updated);
+    setTrend("stat-updated", age > STALE_INDEX ? "Atrasado: se actualiza cada 12 h" : "Al día (se actualiza cada 12 h)", age > STALE_INDEX ? "down" : "up");
     $("meta").textContent = `Actualizado ${ago(index.updated)}`;
-    $("hero-sync-nexora").textContent = ago(index.updated);
 
     if (prediction) {
       const n = (prediction.picks || []).filter((p) => p.expected > 0.02).length;
@@ -1351,6 +1212,7 @@
     view = name;
     document.querySelectorAll(".nav-item").forEach(b => {
       b.classList.toggle("active", b.dataset.view === name);
+      if (b.dataset.view === name) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     });
     document.querySelectorAll(".view-content").forEach(v => {
       v.classList.toggle("active", v.id === name + "-view");
@@ -1385,15 +1247,29 @@
     drawChart();
   });
 
-  $("back").addEventListener("click", () => {
-    if (window.history.length > 1) history.back();
+  // si el detalle se abrió desde la página, "atrás" lo cierra; si llegaron con el enlace directo, se limpia el hash
+  function closeDetail() {
+    if (openedInPage) history.back();
     else location.hash = "dashboard-root";
-  });
-  $("overlay").addEventListener("click", (e) => { 
-    if (e.target === $("overlay")) {
-      if (window.history.length > 1) history.back();
-      else location.hash = "dashboard-root";
+  }
+  $("back").addEventListener("click", closeDetail);
+  $("overlay").addEventListener("click", (e) => { if (e.target === $("overlay")) closeDetail(); });
+
+  // Teclado: Enter abre filas y tarjetas, Esc cierra el detalle, "/" va al buscador
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && current) { e.preventDefault(); closeDetail(); return; }
+    if (e.key === "/" && !e.target.closest("input, select, textarea") && !current) {
+      e.preventDefault(); showView("market"); $("q").focus(); return;
     }
+    if ((e.key === "Enter" || e.key === " ") && e.target.matches("tr[tabindex], .radar-card[tabindex]")) {
+      e.preventDefault(); e.target.click();
+    }
+  });
+
+  $("budget-days").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    budgetDays = Number(b.dataset.days);
+    $("budget-days").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
   });
 
   // ---- Initial Fetch ----
@@ -1406,9 +1282,9 @@
       all = Object.entries(index.items || {}).map(([k, e]) => enrich(k, e));
       
       $("hero-count").textContent = fmt(all.length);
-      $("hero-count-nexora").textContent = fmt(all.length);
-      $("hotel-name").textContent = index.hotel.toUpperCase();
-      $("hero-hotel-nexora").textContent = index.hotel.toUpperCase();
+      $("hotel-name").textContent = index.hotel;
+      $("hotel-sub").textContent = index.hotel;
+      document.title = `Mercado de ${index.hotel} — HabboTracker`;
       $("market-title").textContent = `Analizando el mercado de ${index.hotel.toUpperCase()}, ${fmt(all.length)} furnis rastreados`;
       
       renderStats();
@@ -1452,12 +1328,6 @@
             ind.classList.remove("offline");
             ind.querySelector("span:last-child").textContent = "EN VIVO";
             ind.hidden = false;
-            const badge = document.querySelector(".nexora-badge");
-            const hotelName = $("hotel-name").textContent;
-            badge.textContent = `Habbo Market ${hotelName} — En Vivo`;
-            badge.classList.add("live");
-            badge.style.borderColor = "var(--green)";
-            badge.style.color = "var(--green)";
             if (view === "market") renderList();
             if (view === "live") renderLiveTab();
             if (current) {
@@ -1514,9 +1384,9 @@
       document.body.classList.add("no-alerts");
     } else {
       $("alerts-container").innerHTML = `
-        <div class="stat-card" style="margin-bottom:24px; background:rgba(124, 58, 237, 0.1); border-color:rgba(124, 58, 237, 0.3); display:flex; justify-content:space-between; align-items:center;">
+        <div class="stat-card accent alert-card">
           <div>
-            <h3 style="margin:0 0 4px; font-family:var(--font-head);">Alertas de Telegram Activas</h3>
+            <h3>Alertas de Telegram</h3>
             <p style="margin:0; color:var(--muted); font-size:13px;">Recibe notificaciones de gangas y radar directamente en tu móvil.</p>
           </div>
           <a href="https://t.me/${index.bot}" target="_blank" class="btn-submit" style="text-decoration:none; padding:10px 20px; font-size:13px;">Unirse al Canal</a>
@@ -1553,29 +1423,30 @@
     $("budget-out").innerHTML = `
       <div class="stats-grid" style="margin-top:24px">
         <div class="stat-card">
-          <span class="label">Inversión Total</span>
+          <span class="label">Inversión total</span>
           <span class="value">${fmt(spent)}</span>
         </div>
         <div class="stat-card">
-          <span class="label">Ganancia Estipada</span>
+          <span class="label">Ganancia estimada</span>
           <span class="value" style="color:var(--green)">+${fmt(profit)}</span>
         </div>
       </div>
       <div class="data-section" style="margin-top:24px">
-        <table class="market-table">
-          <thead><tr><th>Furni</th><th>Vende a</th><th>ROI</th><th>Tiempo</th></tr></thead>
+        <div class="table-scroll"><table class="market-table">
+          <thead><tr><th scope="col">Furni</th><th scope="col" class="r">Compra</th><th scope="col" class="r col-hide-sm">Vende a</th><th scope="col" class="r">Ganancia</th><th scope="col" class="r col-hide-sm">Tiempo</th></tr></thead>
           <tbody>
-            ${picks.map(p => `<tr data-key="${p.key}">
+            ${picks.map(p => `<tr data-key="${p.key}" tabindex="0">
               <td><div class="furni-cell">
-                <div class="furni-icon"><img ${iconAttrs(p)}></div>
-                <div>${esc(p.name)}</div>
+                <div class="furni-icon"><img ${iconAttrs(p)} alt=""></div>
+                <div style="min-width:0"><span class="furni-name">${esc(p.name)}</span><span class="furni-key">${esc(p.c)}</span></div>
               </div></td>
-              <td><div class="price-val">${fmt(p.fair)}</div></td>
-              <td><div class="delta-pill down">+${fmt(p.net)} (${Math.round(p.roi * 100)}%)</div></td>
-              <td>~${fmt(Math.max(1, Math.round(p.dr)))} días</td>
+              <td class="r"><span class="price-val">${fmt(p.price)}</span></td>
+              <td class="r col-hide-sm"><span class="price-val">${fmt(p.fair)}</span></td>
+              <td class="r"><span class="delta-pill down">+${fmt(p.net)} (${Math.round(p.roi * 100)}%)</span></td>
+              <td class="r num col-hide-sm">~${fmt(Math.max(1, Math.round(p.dr)))} d</td>
             </tr>`).join("")}
           </tbody>
-        </table>
+        </table></div>
       </div>`;
     bindRows($("budget-out"));
   });
