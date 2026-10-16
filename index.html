@@ -841,7 +841,8 @@
   const fairHtml = (s) => s.fair ? `${fmt(s.fair)}${s.mw ? ` <span class="note" title="Sin ventas en 30 días: mediana del último año">1 año</span>` : ""}` : "—";
   function rowHtml(s) {
     const deltaClass = !s.delta ? "flat" : s.delta < -0.05 ? "down" : s.delta > 0.05 ? "up" : "flat";
-    const deltaText = s.delta ? pct(s.delta) : !s.price ? "sin oferta" : "sin justo";
+    // delta 0 (precio igual al justo) es un dato válido: "0%", no "sin justo"
+    const deltaText = s.delta != null ? pct(s.delta) : !s.price ? "sin oferta" : "sin justo";
     return `<tr data-key="${s.key}" tabindex="0">
       <td>
         <div class="furni-cell">
@@ -1661,7 +1662,7 @@
                 if (pill) {   // antes fallaba aquí si el detalle no tenía esta etiqueta, y apagaba el "EN VIVO"
                   const delta = current.delta;
                   pill.className = `delta-pill ${!delta ? "flat" : delta < -0.05 ? "down" : delta > 0.05 ? "up" : "flat"}`;
-                  pill.textContent = delta ? pct(delta) : "sin oferta";
+                  pill.textContent = delta != null ? pct(delta) : "sin oferta";
                 }
             }
           } catch (e) {
