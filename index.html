@@ -708,6 +708,7 @@
       <div class="stat-card">
         <span class="label">Precio justo</span>
         <span class="value" id="detail-fair">—</span>
+        <span class="trend" id="detail-fair-note" hidden></span>
       </div>
     </div>
 
@@ -811,6 +812,8 @@
     s.launched = s.f;
     s.perDay = s.sold / 30;
     s.hasFair = s.fair != null;
+    s.fairIssue = fairIssue(s);
+    s.fairOk = s.hasFair && !s.fairIssue;
     s.delta = s.price && s.fair ? (s.price - s.fair) / s.fair : null;
     s.q = `${s.name || ""} ${k}`.toLowerCase();
     if (index.live) applyLiveTo(s);
@@ -841,11 +844,24 @@
 
   // Los raros casi nunca tienen ofertas abiertas (Habbo da precio 0) y se venden poco: se dice así en vez de "—".
   const noOfferHtml = `<span class="note" title="Nadie lo está vendiendo en este momento">sin ofertas</span>`;
-  const fairHtml = (s) => s.fair ? `${fmt(s.fair)}${s.mw ? ` <span class="note" title="Sin ventas en 30 días: mediana del último año">1 año</span>` : ""}` : "—";
+  // Un precio justo solo sirve para comparar si sale de varias ventas en varios días y el mercado lo respalda.
+  // La Esquina Anna Verde (a 3 créditos) llegó a mostrar un justo de 780 por una sola venta vieja.
+  function fairIssue(s) {
+    if (s.fair == null) return null;
+    if (s.mq) return "Las ofertas de la última semana estuvieron muy abajo de este precio: las ventas caras parecen casos raros, no el precio normal.";
+    if (s.mw) return "Sin ventas en 30 días: es la mediana del último año.";
+    const days = (s.spark || []).length;
+    if (s.sold < 5 || days < 3) return `Solo ${s.sold} venta${s.sold === 1 ? "" : "s"} en ${days} día${days === 1 ? "" : "s"} del último mes.`;
+    return null;
+  }
+  const fairHtml = (s) => s.fair
+    ? `${fmt(s.fair)}${s.fairIssue ? ` <span class="note" title="${esc(s.fairIssue)}">${s.mw && !s.mq ? "1 año" : "dudoso"}</span>` : ""}`
+    : "—";
   function rowHtml(s) {
-    const deltaClass = !s.delta ? "flat" : s.delta < -0.05 ? "down" : s.delta > 0.05 ? "up" : "flat";
+    const deltaClass = !s.delta || !s.fairOk ? "flat" : s.delta < -0.05 ? "down" : s.delta > 0.05 ? "up" : "flat";
     // delta 0 (precio igual al justo) es un dato válido: "0%", no "sin justo"
-    const deltaText = s.delta != null ? pct(s.delta) : !s.price ? "sin oferta" : "sin justo";
+    const deltaText = s.fairIssue && !s.mw && s.delta != null ? "dudoso"
+      : s.delta != null ? pct(s.delta) : !s.price ? "sin oferta" : "sin justo";
     return `<tr data-key="${s.key}" tabindex="0">
       <td>
         <div class="furni-cell">
@@ -856,7 +872,7 @@
       <td class="r"><span class="price-val">${s.price ? fmt(s.price) : noOfferHtml}</span></td>
       <td class="r col-hide-sm"><span class="price-val" style="color:var(--muted)">${fairHtml(s)}</span></td>
       <td class="col-spark">${sparkSvg(s.spark)}</td>
-      <td class="r"><span class="delta-pill ${deltaClass}">${deltaText}</span></td>
+      <td class="r"><span class="delta-pill ${deltaClass}"${s.fairIssue ? ` title="${esc(s.fairIssue)}"` : ""}>${deltaText}</span></td>
       <td class="r col-hide-sm"><span class="num">${fmt(s.sold)}</span></td>
     </tr>`;
   }
@@ -866,13 +882,14 @@
     let rows = q ? all.filter((s) => s.q.includes(q)) : all.slice();
     if (sortMode === "sold") rows.sort((a, b) => b.sold - a.sold);
     if (sortMode === "price") rows.sort((a, b) => (b.price || 0) - (a.price || 0));
-    if (sortMode === "delta") rows.sort((a, b) => (a.delta ?? Infinity) - (b.delta ?? Infinity));
+    // los de precio justo dudoso van al final: si no, un justo inventado (−99%) encabezaba la lista
+    if (sortMode === "delta") rows.sort((a, b) => (b.fairOk - a.fairOk) || (a.delta ?? Infinity) - (b.delta ?? Infinity));
     
     const page = rows.slice(0, shown);
     $("list").innerHTML = page.map((s) => rowHtml(s)).join("");
     $("more").hidden = shown >= rows.length;
     
-    const opportunities = all.filter(s => s.delta && s.delta < -0.15).length;
+    const opportunities = all.filter(s => s.fairOk && s.delta && s.delta < -0.15).length;
     $("opportunity-count").textContent = opportunities;
   }
 
@@ -1058,7 +1075,7 @@
     for (const k of Object.keys(live.items)) {
       const s = byKey.get(k);
       // sin precio justo del mes (raros) o recién lanzado: no hay contra qué comparar con confianza
-      if (!s || !s.price || !s.fair || s.mw || s.launched || !s.liveAt) continue;
+      if (!s || !s.price || !s.fairOk || s.launched || !s.liveAt) continue;
       if (s.perDay < f.ventas || (f.max && s.price > f.max)) continue;
       const resale = Math.round(s.fair * f.reventa);
       const profit = Math.round(resale * (1 - fee) - s.price);
@@ -1324,19 +1341,33 @@
     }
 
     // Área y línea del precio medio
+    // Tramos: dos ventas separadas por más de 14 días sin ventas no se unen (antes una línea recta "subía"
+    // de 180 a 780 a lo largo de un año en que no se vendió nada). Un tramo de un solo día queda como punto.
     const pts = data.map((d) => [getX(d), getY(d.avg)]);
-    ctx.beginPath();
-    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-    ctx.lineTo(pts[pts.length - 1][0], margin.top + chartH);
-    ctx.lineTo(pts[0][0], margin.top + chartH);
+    const GAP = 14 * DAY, segs = [[0]];
+    for (let i = 1; i < data.length; i++) {
+      if (dated && data[i].t - data[i - 1].t > GAP) segs.push([]);
+      segs.at(-1).push(i);
+    }
     const grad = ctx.createLinearGradient(0, margin.top, 0, margin.top + chartH);
     grad.addColorStop(0, "rgba(245, 184, 61, 0.22)"); grad.addColorStop(1, "rgba(245, 184, 61, 0)");
-    ctx.fillStyle = grad; ctx.fill();
-
-    ctx.beginPath();
     ctx.strokeStyle = "#f5b83d"; ctx.lineWidth = 2; ctx.lineJoin = "round";
-    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-    ctx.stroke();
+    segs.forEach((seg) => {
+      const sp = seg.map((i) => pts[i]);
+      if (sp.length === 1) {
+        ctx.fillStyle = "#f5b83d";
+        ctx.beginPath(); ctx.arc(sp[0][0], sp[0][1], 3, 0, Math.PI * 2); ctx.fill();
+        return;
+      }
+      ctx.beginPath();
+      sp.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.lineTo(sp.at(-1)[0], margin.top + chartH);
+      ctx.lineTo(sp[0][0], margin.top + chartH);
+      ctx.fillStyle = grad; ctx.fill();
+      ctx.beginPath();
+      sp.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.stroke();
+    });
 
     // Pronóstico: abanico desde el último precio hasta el rango a 14 días
     if (fq) {
@@ -1443,6 +1474,9 @@
     if (iconSrc) { icon.referrerPolicy = "no-referrer"; icon.src = iconSrc; } else icon.removeAttribute("src");
     $("detail-price").textContent = s.price ? fmt(s.price) : "Sin ofertas";
     $("detail-fair").innerHTML = fairHtml(s);
+    const fairNote = s.fairIssue || (!s.fair ? "No hay suficientes ventas para calcularlo." : "");
+    $("detail-fair-note").textContent = fairNote;
+    $("detail-fair-note").hidden = !fairNote;
     
     // Extra Decision Info
     const extra = $("detail-extra");
@@ -1451,7 +1485,10 @@
       const fee = index.fee_pct || 1;
       const net = Math.round(s.fair * (1 - fee/100) - s.price) || 0;   // || 0: sin "-0"
       const roi = Math.round((net / s.price) * 100);
-      html += `<div class="stat-card"><span class="label">Ganancia si revendes al justo (con comisión)</span><span class="value ${net > 0 ? 'up' : 'down'}">${net > 0 ? '+' : ''}${fmt(net)} (${roi}%)</span></div>`;
+      html += s.fairOk
+        ? `<div class="stat-card"><span class="label">Ganancia si revendes al justo (con comisión)</span><span class="value ${net > 0 ? 'up' : 'down'}">${net > 0 ? '+' : ''}${fmt(net)} (${roi}%)</span></div>`
+        : `<div class="stat-card"><span class="label">Ganancia si revendes al justo</span><span class="value" style="color:var(--muted);font-size:18px">No confiable</span>
+           <span class="trend">${esc(s.fairIssue)}</span></div>`;
     }
     if (s.fair) {
       html += `<div class="stat-card" id="sell-odds"><span class="label">Si lo publicas al precio justo (${fmt(s.fair)})</span><span class="value">…</span>
@@ -1796,7 +1833,7 @@
     const cands = all.map((s) => {
       const net = s.price && s.fair ? Math.round(s.fair * (1 - fee / 100) - s.price) : 0;
       return { ...s, net, roi: s.price ? net / s.price : 0 };
-    }).filter((s) => !(s.f && daysAgo(s.f) < 14) && !s.mw)
+    }).filter((s) => !(s.f && daysAgo(s.f) < 14) && s.fairOk)
       .filter((s) => s.hasFair && s.price && s.price <= budget && s.perDay >= 1 && s.net >= 2 && s.roi >= 0.03)
       .sort((a, b) => b.roi - a.roi || b.perDay - a.perDay)
       .slice(0, 60);

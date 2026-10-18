@@ -223,16 +223,61 @@ def weighted_percentile(pairs: list[tuple[int, int]], q: float) -> int | None:
     return pairs[-1][0]
 
 
-def long_summary(days: dict[str, list]) -> dict:
+MIN_SALE_DAYS_YEAR = 3   # días con ventas en el año para calcular un precio justo de 1 año
+
+
+def long_summary(days: dict[str, list], today: date) -> dict:
     """Para furnis que casi no se venden (raros): última venta y precio justo con el último año.
     Con solo 30 días, un raro que se vendió hace 6 semanas quedaba sin ningún dato en la página."""
     sales = sorted((d, v) for d, v in days.items() if v[0])
     if not sales:
         return {"last_sale": None, "fair_year": None}
-    last_day = date.fromisoformat(sales[-1][0])
-    since = (last_day - timedelta(days=364)).isoformat()
+    since = (today - timedelta(days=364)).isoformat()
     pairs = [(v[0], v[1] or 1) for d, v in sales if d >= since]
-    return {"last_sale": [sales[-1][0], sales[-1][1][0]], "fair_year": weighted_percentile(pairs, 0.5)}
+    # con ventas en menos de 3 días del año no hay "precio normal": una sola venta rara no lo es
+    fair = weighted_percentile(pairs, 0.5) if len(pairs) >= MIN_SALE_DAYS_YEAR else None
+    return {"last_sale": [sales[-1][0], sales[-1][1][0]], "fair_year": fair}
+
+
+def apply_summary(entry: dict, days: dict[str, list], today: date) -> None:
+    """Escribe en la entrada del índice lo que sale del historial: ventas del mes, minigráfica, precio justo
+    y su rango, días de inventario, última venta y, si no hubo ventas en 30 días, el justo del último año."""
+    sm = summarize(days, today)
+    ls = long_summary(days, today)
+    per_day = sm["sold"] / 30
+    offers = entry.get("o")
+    entry.update({"s": sm["sold"], "sp": sm["spark"], "m": sm["fair"], "l": sm["low"], "h": sm["high"],
+                  "dr": round(offers / per_day, 1) if offers and per_day else None})   # sin ofertas no hay dato
+    entry.pop("mw", None)
+    entry.pop("us", None)
+    if ls["last_sale"]:
+        entry["us"] = ls["last_sale"]                     # última venta: [fecha, precio promedio de ese día]
+    if entry["m"] is None and ls["fair_year"]:
+        entry["m"], entry["mw"] = ls["fair_year"], 365    # sin ventas en 30 días: precio justo del último año
+    # Justo dudoso: si la oferta más barata de la última semana estuvo una y otra vez muy abajo de él, las
+    # ventas caras no fueron el precio de mercado (nadie paga 255 por algo a la venta en 2; suelen ser
+    # traspasos entre cuentas o errores). Se marca en vez de cambiar el número, y la página no lo usa para
+    # gangas ni para "Más baratos".
+    entry.pop("mq", None)
+    week = (today - timedelta(days=6)).isoformat()
+    lows = sorted(v[3] for d, v in days.items() if d >= week and len(v) > 3 and v[3])
+    if entry["m"] and len(lows) >= 3 and lows[len(lows) // 2] * 2 < entry["m"]:
+        entry["mq"] = 1
+
+
+def refresh_summaries(site: Path, items: dict, skip: set, today: date) -> int:
+    """Los furnis que no se consultaron en esta corrida también se recalculan con su historial: si no, su
+    "último mes" se quedaba congelado en el día de su última consulta."""
+    n = 0
+    for key, entry in items.items():
+        if key in skip:
+            continue
+        kind, cls = key.split(":", 1)
+        days = load_json(site / "h" / kind / f"{file_name(cls)}.json", {}).get("d")
+        if days:
+            apply_summary(entry, days, today)
+            n += 1
+    return n
 
 
 def gangas_defaults(config: dict) -> dict:
@@ -241,14 +286,15 @@ def gangas_defaults(config: dict) -> dict:
             "dias": v.get("dias_max_venta", 1), "ventas_dia": v.get("ventas_min_dia", 2)}
 
 
-def summarize(days: dict[str, list]) -> dict:
-    """Resumen de los últimos 30 días con ventas: volumen, minigráfica, precio justo y rango normal."""
-    with_avg = [d for d, v in days.items() if v[0]]
-    if not with_avg:
+def summarize(days: dict[str, list], today: date) -> dict:
+    """Resumen de los últimos 30 días hasta hoy: volumen, minigráfica, precio justo y rango normal.
+    Antes contaba los 30 días anteriores a la ÚLTIMA VENTA: un furni que no se vendía desde hacía meses
+    tomaba como "precio justo del mes" una venta vieja y rara (una Esquina Anna Verde de 3 créditos salía
+    con un justo de 780 por una sola venta)."""
+    since = (today - timedelta(days=29)).isoformat()
+    recent = [v for d, v in sorted(days.items()) if since <= d <= today.isoformat()]
+    if not any(v[0] for v in recent):
         return {"sold": 0, "spark": [], "avg": None, "fair": None, "low": None, "high": None}
-    last = date.fromisoformat(max(with_avg))
-    since = (last - timedelta(days=29)).isoformat()
-    recent = [v for d, v in sorted(days.items()) if d >= since]
     sold = sum(v[1] or 0 for v in recent)
     spark = [v[0] for v in recent if v[0]]
     pairs = [(v[0], v[1]) for v in recent]
@@ -338,6 +384,7 @@ def run(site: Path, hotel: str, full_scan: bool, config: dict, hotels: list[str]
 
     base = HOTELS[hotel]
     done, found_total, stopped = 0, 0, False
+    touched: set[str] = set()   # furnis consultados en esta corrida (los demás se recalculan al final)
     pause, calm, rate_limited = float(state.get("pause", PAUSE)), 0, 0
 
     def checkpoint(scanned_pos: int):
@@ -442,26 +489,20 @@ def run(site: Path, hotel: str, full_scan: bool, config: dict, hotels: list[str]
                 continue  # nunca se ha vendido: no vale la pena guardarlo
             kind, cls = key.split(":", 1)
             days = merge_history(site, kind, cls, stats, today)
-            sm = summarize(days)
+            sm = summarize(days, today)
             if sm["sold"] == 0 and not current and key not in targets and key not in launches:
                 items.pop(key, None)
                 continue
             found_total += 1
             offers = to_int(stats.get("currentOpenOffers"))
-            per_day = sm["sold"] / 30
-            ls = long_summary(days)
             entry = {"n": names.get(key, cls), "c": cls, "t": kind, "p": current,
-                     "a": to_int(stats.get("averagePrice")) or sm["avg"], "s": sm["sold"], "o": offers,
-                     "sp": sm["spark"], "m": sm["fair"], "l": sm["low"], "h": sm["high"],
-                     "dr": round(offers / per_day, 1) if offers and per_day else None,  # sin ofertas no hay dato
+                     "a": to_int(stats.get("averagePrice")) or sm["avg"], "o": offers,
                      "u": datetime.now(timezone.utc).isoformat(timespec="seconds")}
-            if ls["last_sale"]:
-                entry["us"] = ls["last_sale"]                 # última venta: [fecha, precio promedio de ese día]
-            if entry["m"] is None and ls["fair_year"]:
-                entry["m"], entry["mw"] = ls["fair_year"], 365  # sin ventas en 30 días: precio justo del último año
+            apply_summary(entry, days, today)
             if key in launches:
                 entry["f"] = launches[key]
             items[key] = entry
+            touched.add(key)
         done += len(chunk)
         calm += 1
         if calm >= 60 and pause > PAUSE:  # un buen rato sin quejas: se acelera un poco
@@ -473,6 +514,8 @@ def run(site: Path, hotel: str, full_scan: bool, config: dict, hotels: list[str]
             print(f"  {done:,} de {len(queue):,}  ({mins:.0f} min, {found_total:,} con ventas)")
             checkpoint(done)
 
+    refreshed = refresh_summaries(site, items, touched, today)
+    print(f"Resumen recalculado con su historial para {refreshed:,} furnis que no se consultaron hoy.")
     checkpoint(done)
     print(f"Listo: {done:,} consultados, {found_total:,} con datos, {len(items):,} furnis en la página. "
           f"Habbo pidió ir lento {rate_limited} veces; pausa final {pause:.1f} s.")
