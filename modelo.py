@@ -228,3 +228,54 @@ def quantile_report(q: np.ndarray, y: np.ndarray, threshold) -> dict:
         "confident_win": round(float(np.mean(win[hi])), 3) if hi.any() else None,
         "rows": int(len(y)),
     }
+
+
+# ---------------------------------------------------------------------------
+# tiempo de venta, medido y no supuesto
+# ---------------------------------------------------------------------------
+
+SELL_HORIZONS = [1, 2, 3, 5, 7, 14]          # días
+SELL_RATIOS = [0.9, 0.95, 1.0, 1.05, 1.1]    # precio de reventa contra la mediana de 30 días
+SELL_BINS = 10                               # la "q" se agrupa en décimas
+
+
+def sell_calibration(P: np.ndarray, S: np.ndarray, today: int, lookback: int = 200) -> dict:
+    """Qué tan seguido se vendió de verdad un furni a cierto precio, según cuántos de sus últimos 30 días
+    tuvieron ventas a ese precio o más (q). No se puede saber el lugar de una oferta en la fila (Habbo no da
+    los precios de cada oferta), así que se mide lo que pasó: de los casos con una q parecida, en cuántos hubo
+    un día con ventas a ese precio o más dentro de 1, 2, 3, 5, 7 y 14 días. La página usa esta tabla.
+
+    "Ventas a ese precio o más" = el promedio de ese día fue al menos ese precio: es lo más cercano que dan
+    los datos de Habbo a "alguien pagó eso"."""
+    H = SELL_HORIZONS
+    hits = np.zeros((SELL_BINS, len(H)))
+    counts = np.zeros(SELL_BINS)
+    liquid = S[:, max(0, today - 59):today + 1].sum(axis=1) >= 20      # se vende con cierta frecuencia
+    Pl = np.nan_to_num(P[liquid], nan=-1.0)   # sin ventas = nunca llega al precio
+    start = max(30, today - lookback)
+    for t in range(start, today - H[-1], 2):
+        window = Pl[:, t - 29:t + 1]
+        med = np.nanmedian(np.where(window > 0, window, np.nan), axis=1)
+        ok = np.isfinite(med) & (np.sum(window > 0, axis=1) >= 5)
+        if not ok.any():
+            continue
+        fut = Pl[ok, t + 1:t + 1 + H[-1]]
+        for r in SELL_RATIOS:
+            X = (med[ok] * r)[:, None]
+            q = np.mean(window[ok] >= X, axis=1)
+            b = np.minimum((q * SELL_BINS).astype(int), SELL_BINS - 1)
+            reached = fut >= X
+            first = np.where(reached.any(axis=1), np.argmax(reached, axis=1) + 1, 10 ** 6)
+            for j, d in enumerate(H):
+                np.add.at(hits[:, j], b, first <= d)
+            np.add.at(counts, b, 1)
+    with np.errstate(invalid="ignore"):
+        prob = hits / counts[:, None]
+    # una décima sin casos toma la de al lado, y nunca baja al subir q o los días
+    for i in range(SELL_BINS):
+        if counts[i] < 50:
+            prob[i] = prob[i - 1] if i else np.zeros(len(H))
+    prob = np.maximum.accumulate(np.maximum.accumulate(np.nan_to_num(prob), axis=0), axis=1)
+    return {"horizons": H, "bins": SELL_BINS,
+            "p": [[round(float(v), 3) for v in row] for row in prob],
+            "n": [int(c) for c in counts]}

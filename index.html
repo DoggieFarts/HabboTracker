@@ -633,15 +633,19 @@
       </div>
       <div class="callout" role="note">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-        <span>Los precios se leen cada 1–2 minutos en los furnis más vendidos y cada varios minutos en el resto: otra persona puede comprar la ganga antes. Revisa el precio en el juego antes de comprar. "Se revende en" es un estimado con las ofertas abiertas y las ventas del último mes.</span>
+        <span>Los precios se leen cada 1–2 minutos en los furnis más vendidos y cada varios minutos en el resto: otra persona puede comprar la ganga antes. Revisa el precio en el juego antes de comprar. La probabilidad de venta no es una suposición: se midió con lo que de verdad pasó en el último año con furnis que se vendían a ese precio igual de seguido. Habbo no muestra el precio de cada oferta de la fila, así que nadie puede darte el tiempo exacto.</span>
       </div>
       <form class="data-section" id="deal-form" style="margin-bottom:20px" onsubmit="return false">
         <div class="section-header"><h2>Tus filtros</h2></div>
         <div class="deal-filters">
           <div class="form-group"><label class="form-label" for="f-desc">Descuento mínimo (%)</label><input class="form-input" id="f-desc" type="number" min="0" max="90" step="1" inputmode="numeric"></div>
           <div class="form-group"><label class="form-label" for="f-gan">Ganancia mínima (créditos)</label><input class="form-input" id="f-gan" type="number" min="0" step="1" inputmode="numeric"></div>
-          <div class="form-group"><label class="form-label" for="f-dias">Revender en máximo</label>
-            <select class="form-input" id="f-dias"><option value="0.5">medio día</option><option value="1">1 día</option><option value="2">2 días</option><option value="3">3 días</option><option value="7">7 días</option></select></div>
+          <div class="form-group"><label class="form-label" for="f-reventa">Revender a</label>
+            <select class="form-input" id="f-reventa"><option value="1">el precio justo</option><option value="0.95">5% abajo del justo</option><option value="0.9">10% abajo del justo</option></select></div>
+          <div class="form-group"><label class="form-label" for="f-dias">Venderlo en máximo</label>
+            <select class="form-input" id="f-dias"><option value="1">1 día</option><option value="2">2 días</option><option value="3">3 días</option><option value="5">5 días</option><option value="7">7 días</option><option value="14">14 días</option></select></div>
+          <div class="form-group"><label class="form-label" for="f-prob">Con probabilidad mínima</label>
+            <select class="form-input" id="f-prob"><option value="0.4">40%</option><option value="0.5">50%</option><option value="0.6">60%</option><option value="0.7">70%</option><option value="0.8">80%</option></select></div>
           <div class="form-group"><label class="form-label" for="f-ventas">Ventas mínimas por día</label><input class="form-input" id="f-ventas" type="number" min="0" step="0.5" inputmode="decimal"></div>
           <div class="form-group"><label class="form-label" for="f-max">Precio máximo (opcional)</label><input class="form-input" id="f-max" type="number" min="0" step="1" inputmode="numeric" placeholder="Sin límite"></div>
         </div>
@@ -668,9 +672,9 @@
         <div class="form-group">
           <span class="form-label" id="budget-days-label">Tiempo máximo de reventa</span>
           <div class="controls" id="budget-days" role="group" aria-labelledby="budget-days-label">
+            <button type="button" class="btn-filter" data-days="3">3 días</button>
             <button type="button" class="btn-filter" data-days="7" aria-pressed="true">7 días</button>
-            <button type="button" class="btn-filter" data-days="15">15 días</button>
-            <button type="button" class="btn-filter" data-days="30">30 días</button>
+            <button type="button" class="btn-filter" data-days="14">14 días</button>
           </div>
         </div>
         <button type="submit" id="budget-go" class="btn-submit">Calcular inversión</button>
@@ -821,7 +825,6 @@
     s.price = p || null;
     if (o != null) s.offers = o;
     s.delta = s.price && s.fair ? (s.price - s.fair) / s.fair : null;
-    if (o != null && s.perDay) s.dr = Math.round(o / s.perDay * 10) / 10;
     s.liveAt = (live.t - age) * 1000;
     return true;
   }
@@ -961,12 +964,66 @@
     }).join("");
   }
 
+  // ---- Tiempo de venta: medido, no supuesto ----
+  // prediccion.py mide con el último año: de los casos en que un furni se vendió a cierto precio o más en
+  // k de sus últimos 30 días, ¿en cuántos se volvió a vender a ese precio dentro de 1, 2, 3, 5, 7 y 14 días?
+  // Aquí se cuenta k para el furni y se lee esa tabla. Antes se usaba ofertas ÷ ventas por día, que suponía
+  // que tu oferta era la primera de la fila: decía "1 día" y solo 43% se vendía en un día.
+  const histCache = new Map();
+  function loadHist(s) {
+    if (!histCache.has(s.key)) {
+      histCache.set(s.key, fetch(`h/${s.t}/${fileName(s.c)}.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+    }
+    return histCache.get(s.key);
+  }
+  function sellOdds(hist, price) {
+    const cal = prediction && prediction.sell_time;
+    if (!cal || !hist || !hist.d) return null;
+    const dates = Object.keys(hist.d).sort();
+    if (!dates.length) return null;
+    const last = Date.parse(dates.at(-1) + "T00:00:00Z");
+    let k = 0;
+    for (let i = 0; i < 30; i++) {
+      const v = hist.d[new Date(last - i * DAY).toISOString().slice(0, 10)];
+      if (v && v[0] && v[0] >= price) k++;
+    }
+    // la tabla viene por décimas de k/30: se interpola entre los centros de las dos más cercanas
+    const x = Math.max(0, Math.min(cal.bins - 1, (k / 30) * cal.bins - 0.5));
+    const i0 = Math.floor(x), i1 = Math.min(cal.bins - 1, i0 + 1), w = x - i0;
+    const p = cal.p[i0].map((v, j) => v * (1 - w) + cal.p[i1][j] * w);
+    return { k, p, horizons: cal.horizons };
+  }
+  // probabilidad de venderlo en `days` días o menos (solo plazos medidos; entre dos, el menor)
+  function probWithin(o, days) {
+    let p = 0;
+    o.horizons.forEach((h, i) => { if (h <= days) p = o.p[i]; });
+    return p;
+  }
+  // el plazo en que ya es más probable que sí que no
+  function typicalWait(o) {
+    const i = o.p.findIndex((v) => v >= 0.5);
+    return i < 0 ? `más de ${o.horizons.at(-1)} d` : `~${o.horizons[i]} d`;
+  }
+  const pctTone = (p) => (p >= 0.6 ? "var(--green)" : p < 0.4 ? "var(--red)" : "var(--accent)");
+
+  async function renderSellOdds(s, hist) {
+    await loadPrediction();
+    const box = $("sell-odds");
+    if (!box || current !== s) return;
+    const o = sellOdds(hist, s.fair);
+    if (!o) { box.querySelector(".value").textContent = "Sin datos"; box.querySelector(".trend").textContent = "No hay historial suficiente"; return; }
+    const p1 = probWithin(o, 1), p7 = probWithin(o, 7);
+    box.querySelector(".value").innerHTML = `<span style="color:${pctTone(p1)}">${Math.round(p1 * 100)}%</span> en 1 día`;
+    box.querySelector(".trend").textContent = `${Math.round(p7 * 100)}% en 7 días. Se vendió a ${fmt(s.fair)} o más en ${o.k} de los últimos 30 días.`;
+  }
+
   // ---- Gangas en vivo ----
   // Cada visitante ajusta sus filtros; los valores de inicio vienen de avisos.json (vigia).
   const DEAL_KEY = "gangas-filtros";
   function dealDefaults() {
     const g = (index && index.gangas) || {};
-    return { desc: g.descuento_pct ?? 15, gan: g.ganancia ?? 20, dias: g.dias ?? 1, ventas: g.ventas_dia ?? 2, max: "" };
+    return { desc: g.descuento_pct ?? 15, gan: g.ganancia ?? 20, dias: g.dias ?? 1, ventas: g.ventas_dia ?? 2, max: "",
+             reventa: 1, prob: 0.5 };
   }
   function dealFilters() {
     let saved = {};
@@ -977,14 +1034,17 @@
     const f = dealFilters();
     $("f-desc").value = f.desc; $("f-gan").value = f.gan; $("f-dias").value = String(f.dias);
     $("f-ventas").value = f.ventas; $("f-max").value = f.max;
+    $("f-reventa").value = String(f.reventa); $("f-prob").value = String(f.prob);
+    if (!$("f-dias").value) $("f-dias").value = "1";   // un valor guardado que ya no existe (antes había "medio día")
   }
   function saveDealForm() {
     const f = { desc: Number($("f-desc").value) || 0, gan: Number($("f-gan").value) || 0, dias: Number($("f-dias").value) || 1,
-                ventas: Number($("f-ventas").value) || 0, max: $("f-max").value ? Number($("f-max").value) : "" };
+                ventas: Number($("f-ventas").value) || 0, max: $("f-max").value ? Number($("f-max").value) : "",
+                reventa: Number($("f-reventa").value) || 1, prob: Number($("f-prob").value) || 0.5 };
     try { localStorage.setItem(DEAL_KEY, JSON.stringify(f)); } catch (e) {}
     renderDeals();
   }
-  ["f-desc", "f-gan", "f-dias", "f-ventas", "f-max"].forEach((id) => $(id).addEventListener("input", saveDealForm));
+  ["f-desc", "f-gan", "f-dias", "f-ventas", "f-max", "f-reventa", "f-prob"].forEach((id) => $(id).addEventListener("input", saveDealForm));
   $("deal-reset").addEventListener("click", () => {
     try { localStorage.removeItem(DEAL_KEY); } catch (e) {}
     fillDealForm(); renderDeals();
@@ -1000,36 +1060,52 @@
       // sin precio justo del mes (raros) o recién lanzado: no hay contra qué comparar con confianza
       if (!s || !s.price || !s.fair || s.mw || s.launched || !s.liveAt) continue;
       if (s.perDay < f.ventas || (f.max && s.price > f.max)) continue;
-      const profit = Math.round(s.fair * (1 - fee) - s.price);
+      const resale = Math.round(s.fair * f.reventa);
+      const profit = Math.round(resale * (1 - fee) - s.price);
       const disc = 1 - s.price / s.fair;
-      const days = (s.offers || 0) / s.perDay;
-      if (disc * 100 < f.desc || profit < f.gan || days > f.dias) continue;
-      out.push({ s, profit, disc, days, age: Math.max(0, Math.round((now - s.liveAt) / 1000)) });
+      if (disc * 100 < f.desc || profit < f.gan) continue;
+      out.push({ s, resale, profit, disc, age: Math.max(0, Math.round((now - s.liveAt) / 1000)) });
     }
     return out.sort((a, b) => b.profit - a.profit);
   }
 
-  function renderDeals() {
+  let dealsRun = 0;
+  async function renderDeals() {
     if (!index) return;
     const status = $("deals-status");
     if (!index.live) { status.textContent = "Este hotel no tiene precios en vivo."; $("deals").innerHTML = ""; return; }
     if (!live) { status.textContent = "Esperando precios en vivo…"; $("deals").innerHTML = ""; return; }
-    const deals = findDeals(dealFilters());
+    const run = ++dealsRun, f = dealFilters();
+    await loadPrediction();
+    // la probabilidad de venta necesita el historial de cada candidato (se guarda: se baja una vez por furni)
+    const cands = findDeals(f).slice(0, 60);
+    const hists = await Promise.all(cands.map((d) => loadHist(d.s)));
+    if (run !== dealsRun) return;   // llegó una actualización más nueva mientras se bajaban
+    const deals = [];
+    cands.forEach((d, i) => {
+      const o = sellOdds(hists[i], d.resale);
+      if (!o) return;
+      d.odds = o; d.p = probWithin(o, f.dias);
+      if (d.p >= f.prob) deals.push(d);
+    });
     status.textContent = `${fmt(Object.keys(live.items).length)} precios en vivo revisados · ${deals.length} ganga${deals.length === 1 ? "" : "s"} · se actualiza cada 15 s`;
     if (!deals.length) {
-      $("deals").innerHTML = `<div class="empty"><strong>Ninguna ganga con tus filtros ahora mismo</strong>Prueba bajar el descuento o la ganancia mínima, o dar más días para revender.</div>`;
+      $("deals").innerHTML = `<div class="empty"><strong>Ninguna ganga con tus filtros ahora mismo</strong>${cands.length
+        ? `Hay ${cands.length} furni${cands.length === 1 ? "" : "s"} con descuento, pero ninguno se vendió lo bastante seguido a ese precio para venderlo en ${f.dias} día${f.dias == 1 ? "" : "s"} con ${Math.round(f.prob * 100)}% de probabilidad. Prueba revender un poco abajo del justo o dar más días.`
+        : "Prueba bajar el descuento o la ganancia mínima."}</div>`;
       return;
     }
     $("deals").innerHTML = `<div class="table-scroll"><table class="market-table"><thead><tr>
-        <th scope="col">Furni</th><th scope="col" class="r">Compra a</th><th scope="col" class="r col-hide-sm">Justo</th>
-        <th scope="col" class="r">Ganancia</th><th scope="col" class="r col-hide-sm">Se revende en</th><th scope="col" class="r col-hide-sm">Leído</th></tr></thead>
-      <tbody>${deals.slice(0, 100).map(({ s, profit, disc, days, age }) => `<tr data-key="${s.key}" tabindex="0">
+        <th scope="col">Furni</th><th scope="col" class="r">Compra a</th><th scope="col" class="r col-hide-sm">Revende a</th>
+        <th scope="col" class="r">Ganancia</th><th scope="col" class="r">Venta en ≤${f.dias} d</th><th scope="col" class="r col-hide-sm">Normalmente</th><th scope="col" class="r col-hide-sm">Leído</th></tr></thead>
+      <tbody>${deals.slice(0, 100).map(({ s, resale, profit, disc, age, p, odds }) => `<tr data-key="${s.key}" tabindex="0">
         <td><div class="furni-cell"><div class="furni-icon"><img ${iconAttrs(s)} alt=""></div>
-          <div style="min-width:0"><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${Math.round(disc * 100)}% abajo del justo</span></div></div></td>
+          <div style="min-width:0"><span class="furni-name">${esc(s.name)}</span><span class="furni-key" title="Se vendió a ${fmt(resale)} o más en ${odds.k} de los últimos 30 días">${Math.round(disc * 100)}% abajo · a ese precio ${odds.k}/30 días</span></div></div></td>
         <td class="r"><span class="price-val">${fmt(s.price)}</span></td>
-        <td class="r col-hide-sm"><span class="price-val" style="color:var(--muted)">${fmt(s.fair)}</span></td>
+        <td class="r col-hide-sm"><span class="price-val" style="color:var(--muted)">${fmt(resale)}</span></td>
         <td class="r"><span class="delta-pill down">+${fmt(profit)}</span></td>
-        <td class="r num col-hide-sm">~${days < 1 ? Math.max(1, Math.round(days * 24)) + " h" : days.toFixed(1) + " d"}</td>
+        <td class="r num" style="color:${pctTone(p)}">${Math.round(p * 100)}%</td>
+        <td class="r num col-hide-sm">${typicalWait(odds)}</td>
         <td class="r num col-hide-sm" style="color:var(--muted)">${age < 60 ? age + " s" : Math.round(age / 60) + " min"}</td>
       </tr>`).join("")}</tbody></table></div>`;
     bindRows($("deals"));
@@ -1377,11 +1453,16 @@
       const roi = Math.round((net / s.price) * 100);
       html += `<div class="stat-card"><span class="label">Ganancia si revendes al justo (con comisión)</span><span class="value ${net > 0 ? 'up' : 'down'}">${net > 0 ? '+' : ''}${fmt(net)} (${roi}%)</span></div>`;
     }
-    if (s.dr != null) {
-      html += `<div class="stat-card"><span class="label">Días para vender las ofertas</span><span class="value">${s.dr} días</span></div>`;
+    if (s.fair) {
+      html += `<div class="stat-card" id="sell-odds"><span class="label">Si lo publicas al precio justo (${fmt(s.fair)})</span><span class="value">…</span>
+        <span class="trend">Midiendo con su historial</span></div>`;
     }
     html += `</div>`;
     
+    if (s.offers != null && s.perDay) {
+      html += `<div class="info-row" style="margin-bottom:12px"><span>Ofertas en venta: <b class="num">${fmt(s.offers)}</b></span>
+        <span style="color:var(--muted)">se venden ~${fmt(Math.round(s.perDay))} al día</span></div>`;
+    }
     if (s.us) {
       const [d, p] = s.us, age = daysAgo(d);
       html += `<div class="info-row" style="margin-bottom:12px"><span>Última venta: <b class="num">${fmt(p)}</b> (promedio de ese día)</span>
@@ -1412,7 +1493,7 @@
     try {
       const r = await fetch(`h/${s.t}/${fileName(s.c)}.json`);
       const hist = r.ok ? await r.json() : { d: {} };
-      if (current === s) { currentHistory = hist; drawChart(); }
+      if (current === s) { currentHistory = hist; drawChart(); histCache.set(s.key, Promise.resolve(hist)); renderSellOdds(s, hist); }
     } catch (e) {
       if (current === s) { currentHistory = { d: {} }; drawChart(); }
     }
@@ -1705,26 +1786,36 @@
     });
 
   // Budget logic simplified for this example
-  $("budget-go").addEventListener("click", () => {
+  $("budget-go").addEventListener("click", async () => {
     const fee = Number(index.fee_pct ?? 1);
     const budget = parseInt($("budget").value, 10);
     if (!budget || budget < 1) return;
-    
+    const btn = $("budget-go");
+    btn.disabled = true; btn.textContent = "Midiendo tiempos de venta…";
+
     const cands = all.map((s) => {
       const net = s.price && s.fair ? Math.round(s.fair * (1 - fee / 100) - s.price) : 0;
       return { ...s, net, roi: s.price ? net / s.price : 0 };
-    }).filter((s) => !(s.f && daysAgo(s.f) < 14))
-      .filter((s) => s.hasFair && s.price && s.price <= budget && s.perDay >= 1 && s.dr != null && s.dr <= budgetDays && s.net >= 2 && s.roi >= 0.03)
-      .sort((a, b) => b.roi - a.roi || b.perDay - a.perDay);
-    
+    }).filter((s) => !(s.f && daysAgo(s.f) < 14) && !s.mw)
+      .filter((s) => s.hasFair && s.price && s.price <= budget && s.perDay >= 1 && s.net >= 2 && s.roi >= 0.03)
+      .sort((a, b) => b.roi - a.roi || b.perDay - a.perDay)
+      .slice(0, 60);
+    await loadPrediction();
+    const hists = await Promise.all(cands.map(loadHist));
+    btn.disabled = false; btn.textContent = "Calcular inversión";
+
+    // solo entra si, al precio justo, es más probable que sí se venda en el plazo elegido que que no
     const picks = []; let left = budget;
-    for (const c of cands) {
-      if (picks.length >= 10) break;
-      if (c.price <= left) { picks.push(c); left -= c.price; }
-    }
-    
+    cands.forEach((c, i) => {
+      if (picks.length >= 10 || c.price > left) return;
+      const o = sellOdds(hists[i], c.fair);
+      if (!o) return;
+      c.odds = o; c.p = probWithin(o, budgetDays);
+      if (c.p >= 0.5) { picks.push(c); left -= c.price; }
+    });
+
     if (!picks.length) {
-      $("budget-out").innerHTML = `<div class="empty"><strong>Nada convence por ahora</strong>Ningún furni que quepa en tu presupuesto está por debajo de su precio justo y se revende en ${budgetDays} días o menos.</div>`;
+      $("budget-out").innerHTML = `<div class="empty"><strong>Nada convence por ahora</strong>Ningún furni que quepa en tu presupuesto está por debajo de su precio justo y tiene al menos 50% de probabilidad de venderse al justo en ${budgetDays} días.</div>`;
       return;
     }
     
@@ -1736,13 +1827,13 @@
           <span class="value">${fmt(spent)}</span>
         </div>
         <div class="stat-card">
-          <span class="label">Ganancia estimada</span>
+          <span class="label">Ganancia si todo se vende al justo</span>
           <span class="value" style="color:var(--green)">+${fmt(profit)}</span>
         </div>
       </div>
       <div class="data-section" style="margin-top:24px">
         <div class="table-scroll"><table class="market-table">
-          <thead><tr><th scope="col">Furni</th><th scope="col" class="r">Compra</th><th scope="col" class="r col-hide-sm">Vende a</th><th scope="col" class="r">Ganancia</th><th scope="col" class="r col-hide-sm">Tiempo</th></tr></thead>
+          <thead><tr><th scope="col">Furni</th><th scope="col" class="r">Compra</th><th scope="col" class="r col-hide-sm">Vende a</th><th scope="col" class="r">Ganancia</th><th scope="col" class="r">Venta en ≤${budgetDays} d</th><th scope="col" class="r col-hide-sm">Normalmente</th></tr></thead>
           <tbody>
             ${picks.map(p => `<tr data-key="${p.key}" tabindex="0">
               <td><div class="furni-cell">
@@ -1752,7 +1843,8 @@
               <td class="r"><span class="price-val">${fmt(p.price)}</span></td>
               <td class="r col-hide-sm"><span class="price-val">${fmt(p.fair)}</span></td>
               <td class="r"><span class="delta-pill down">+${fmt(p.net)} (${Math.round(p.roi * 100)}%)</span></td>
-              <td class="r num col-hide-sm">~${fmt(Math.max(1, Math.round(p.dr)))} d</td>
+              <td class="r num" style="color:${pctTone(p.p)}">${Math.round(p.p * 100)}%</td>
+              <td class="r num col-hide-sm">${typicalWait(p.odds)}</td>
             </tr>`).join("")}
           </tbody>
         </table></div>
