@@ -519,6 +519,10 @@ def main() -> int:
     print(f"Mercado: {market['change7']:+.1%} en 7 días, {market['change30']:+.1%} en 30, {market['change90']:+.1%} en 90; "
           f"{(market['breadth'] or 0):.0%} de los furnis arriba de su mediana del mes.")
 
+    sell = modelo.sell_calibration(P, S, today)
+    print("Tiempo de venta medido (q = días con ventas a ese precio o más de 30 → probabilidad de vender en 1 / 7 días):",
+          ", ".join(f"q≈{(i + .5) / sell['bins']:.0%}: {sell['p'][i][0]:.0%}/{sell['p'][i][4]:.0%}" for i in (1, 3, 5, 7, 9)))
+
     table = season_table(P, S, themes, fee, today)
     calendar = season_calendar(table, themes, start)
     print("Temporadas:", ", ".join(f"{c['name']} {c['items']} furnis" for c in calendar))
@@ -527,7 +531,7 @@ def main() -> int:
     rows = week_rows(P, S, O, themes, table, fee, today, first, other_med30)
     bt = backtest(rows)
     if not bt:
-        out_path.write_text(json.dumps({**base, "enabled": False, "seasons": calendar, "market": market,
+        out_path.write_text(json.dumps({**base, "enabled": False, "seasons": calendar, "market": market, "sell_time": sell,
                                         "reason": "Todavía no hay suficientes semanas de historial para probar las señales."},
                                        ensure_ascii=False))
         print("Muy pocas fechas para probar.")
@@ -599,7 +603,7 @@ def main() -> int:
             ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
         print(f"Pronóstico: {len(fc['items']):,} furnis.")
 
-    result = {**base, **summary, "picks": picks, "seasons": calendar, "market": market}
+    result = {**base, **summary, "picks": picks, "seasons": calendar, "market": market, "sell_time": sell}
     out_path.write_text(json.dumps(result, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"Listo: {len(picks)} recomendaciones.")
     return 0
