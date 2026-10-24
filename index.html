@@ -1,0 +1,1895 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070b14">
+<meta name="description" content="Precios del Mercadillo de Habbo: precio justo, historial de 2 años, precios en vivo y radar de oportunidades.">
+<title>Habbo Market — HabboTracker</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 5 5' shape-rendering='crispEdges'%3E%3Cpath fill='%238C5E06' d='M1 0h3v5H1zM0 1h5v3H0z'/%3E%3Cpath fill='%23D6961A' d='M1 1h3v3H1z'/%3E%3Cpath fill='%23F6D46B' d='M1 1h1v1H1z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Sistema de diseño (skill ui-ux-pro-max): Dark Mode OLED, Fira Sans + Fira Code, acento oro crédito */
+  :root {
+    --bg: #070b14;
+    --surface: #0d1320;
+    --surface-2: #131b2b;
+    --surface-3: #1a2436;
+    --border: #1f2a3d;
+    --border-strong: #2c3a52;
+    --text: #e8ecf3;
+    --muted: #94a3b8;          /* 6.8:1 sobre --surface */
+    --faint: #64748b;
+    --accent: #f5b83d;         /* oro de los créditos de Habbo */
+    --accent-strong: #ffc857;
+    --accent-ink: #1a1203;     /* texto sobre el oro */
+    --accent-soft: rgba(245, 184, 61, 0.12);
+    --green: #34d399;
+    --green-soft: rgba(52, 211, 153, 0.12);
+    --red: #f87171;
+    --red-soft: rgba(248, 113, 113, 0.12);
+    --font-head: 'Fira Sans', system-ui, sans-serif;
+    --font-body: 'Fira Sans', system-ui, sans-serif;
+    --mono: 'Fira Code', ui-monospace, monospace;
+    --radius: 14px;
+    --radius-sm: 10px;
+    --sidebar-width: 248px;
+    --topbar-height: 64px;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    /* capas */
+    --z-sticky: 10; --z-nav: 20; --z-overlay: 50;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .num, .price-val, .value, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+  #dashboard-root { display: flex; min-height: 100vh; }
+
+  /* ---------- Barra lateral ---------- */
+  .sidebar {
+    width: var(--sidebar-width);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 20px 14px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    z-index: var(--z-nav);
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px 22px;
+    font-weight: 700; font-size: 18px; letter-spacing: -0.01em;
+    color: var(--text); text-decoration: none;
+  }
+  .logo-icon {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--accent-strong), #d6961a);
+    color: var(--accent-ink);
+    display: grid; place-items: center;
+    font-family: var(--mono); font-weight: 600;
+  }
+  .logo small { display: block; font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+  .nav-label { padding: 0 12px 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+  .nav-group { display: flex; flex-direction: column; gap: 4px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    min-height: 44px; padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--muted);
+    font-weight: 500; text-align: left; width: 100%;
+    cursor: pointer;
+    transition: color .2s, background-color .2s, border-color .2s;
+  }
+  .nav-item svg { width: 20px; height: 20px; flex-shrink: 0; }
+  .nav-item:hover { color: var(--text); background: var(--surface-2); }
+  .nav-item.active { color: var(--text); background: var(--accent-soft); border-color: rgba(245, 184, 61, 0.25); }
+  .nav-item.active svg { color: var(--accent); }
+  .sidebar-footer { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); }
+  .sidebar-footer label { display: block; font-size: 12px; color: var(--muted); margin: 0 4px 6px; }
+
+  .hotel-select {
+    width: 100%; min-height: 44px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: border-color .2s;
+  }
+  .hotel-select:hover { border-color: var(--border-strong); }
+
+  /* ---------- Área principal ---------- */
+  .main-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .top-bar {
+    position: sticky; top: 0; z-index: var(--z-sticky);
+    height: var(--topbar-height);
+    padding: 0 32px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    background: rgba(7, 11, 20, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .search-wrapper { position: relative; flex: 1; max-width: 460px; }
+  .search-wrapper input {
+    width: 100%; min-height: 42px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 9px 56px 9px 40px;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .search-wrapper input::placeholder { color: var(--faint); }
+  .search-wrapper input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .search-wrapper svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); width: 18px; height: 18px; pointer-events: none; }
+  .search-wrapper kbd {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    border: 1px solid var(--border-strong); border-radius: 6px; padding: 1px 7px;
+  }
+  .top-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 999px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px; font-weight: 500; white-space: nowrap;
+  }
+  #live-indicator { background: var(--green-soft); border-color: rgba(52, 211, 153, 0.3); color: var(--green); font-weight: 600; letter-spacing: 0.04em; }
+  #live-indicator.offline { background: var(--red-soft); border-color: rgba(248, 113, 113, 0.3); color: var(--red); }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 0 currentColor; animation: pulse-ring 2s ease-out infinite; }
+  #live-indicator.offline .pulse { animation: none; }
+  @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.6); } 70%, 100% { box-shadow: 0 0 0 8px rgba(52, 211, 153, 0); } }
+
+  .content-scroll { flex: 1; padding: 32px; width: 100%; max-width: 1280px; margin: 0 auto; }
+  .view-header { margin-bottom: 24px; }
+  .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin: 0 0 6px; }
+  .view-header h1 { font-size: 28px; line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 6px; }
+  .view-header p { color: var(--muted); margin: 0; max-width: 70ch; }
+
+  /* ---------- Tarjetas ---------- */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    min-width: 0;
+  }
+  .stat-card .label { display: block; color: var(--muted); font-size: 13px; font-weight: 500; margin-bottom: 8px; }
+  .stat-card .value { display: block; font-size: 26px; font-weight: 600; line-height: 1.2; margin-bottom: 6px; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+  .stat-card .value.up { color: var(--green); }
+  .stat-card .value.down { color: var(--red); }
+  .stat-card .trend { display: block; font-size: 12.5px; color: var(--muted); }
+  .trend.up { color: var(--green); }
+  .trend.down { color: var(--red); }
+  .stat-card.accent { border-color: rgba(245, 184, 61, 0.3); background: linear-gradient(180deg, var(--accent-soft), var(--surface) 70%); }
+
+  .data-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .section-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; flex-wrap: wrap; gap: 12px;
+    justify-content: space-between; align-items: center;
+  }
+  .section-header h2 { font-size: 17px; font-weight: 600; margin: 0; }
+
+  /* Controles segmentados */
+  .controls { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; }
+  .btn-filter {
+    min-height: 36px; padding: 6px 14px;
+    background: transparent; border: none; border-radius: 8px;
+    color: var(--muted); font-size: 13.5px; font-weight: 500;
+    cursor: pointer;
+    transition: color .2s, background-color .2s;
+  }
+  .btn-filter:hover { color: var(--text); background: var(--surface-3); }
+  .btn-filter[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+  /* ---------- Tablas ---------- */
+  .market-table { width: 100%; border-collapse: collapse; text-align: left; }
+  .market-table th {
+    position: sticky; top: 0;
+    padding: 11px 20px;
+    background: var(--surface);
+    color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .market-table td { padding: 12px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .market-table tbody tr:last-child td { border-bottom: none; }
+  .market-table tbody tr { cursor: pointer; transition: background-color .15s; }
+  .market-table tbody tr:hover { background: var(--surface-2); }
+  .market-table tbody tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--surface-2); }
+  .market-table th.r, .market-table td.r { text-align: right; }
+
+  .furni-cell { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .furni-icon {
+    width: 40px; height: 40px; flex-shrink: 0;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+    display: grid; place-items: center;
+  }
+  .furni-icon img { max-width: 32px; max-height: 32px; image-rendering: pixelated; }
+  .furni-name { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 28ch; }
+  .furni-key { display: block; color: var(--faint); font-size: 12px; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 28ch; }
+
+  .spark { display: block; }
+  .price-val { font-weight: 500; font-size: 15px; white-space: nowrap; }
+  .delta-pill { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 6px; font-family: var(--mono); font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .delta-pill.down { background: var(--green-soft); color: var(--green); }
+  .delta-pill.up { background: var(--red-soft); color: var(--red); }
+  .delta-pill.flat { background: var(--surface-3); color: var(--muted); }
+
+  .more-btn {
+    display: block; width: 100%; min-height: 48px;
+    background: transparent; border: none; border-top: 1px solid var(--border);
+    color: var(--accent); font-weight: 600;
+    cursor: pointer; transition: background-color .2s;
+  }
+  .more-btn:hover { background: var(--surface-2); }
+
+  /* ---------- Panel de detalle ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: var(--z-overlay);
+    display: flex; justify-content: flex-end;
+    pointer-events: none;
+    background: rgba(2, 4, 10, 0);
+    transition: background-color .25s;
+  }
+  .overlay.active { background: rgba(2, 4, 10, 0.65); pointer-events: auto; }
+  .detail-panel {
+    width: min(640px, 100%); height: 100%;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    padding: 28px;
+    overflow-y: auto; overscroll-behavior: contain;
+    transform: translateX(100%);
+    transition: transform .3s var(--ease);
+  }
+  .overlay.active .detail-panel { transform: translateX(0); }
+  .detail-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 24px; }
+  .detail-title { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .detail-title .furni-icon { width: 56px; height: 56px; border-radius: 12px; }
+  .detail-title .furni-icon img { max-width: 44px; max-height: 44px; }
+  #detail-name { margin: 0; font-size: 22px; line-height: 1.25; letter-spacing: -0.01em; }
+  #detail-key { color: var(--muted); font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+  .close-btn {
+    width: 44px; height: 44px; flex-shrink: 0;
+    display: grid; place-items: center;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
+    color: var(--muted); cursor: pointer;
+    transition: color .2s, background-color .2s;
+  }
+  .close-btn:hover { color: var(--text); background: var(--surface-3); }
+
+  .detail-panel .stats-grid { grid-template-columns: 1fr 1fr; margin-bottom: 20px; }
+  .panel-heading { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin: 8px 0 12px; }
+  .panel-heading h2 { font-size: 16px; font-weight: 600; margin: 0; }
+  .chart-container {
+    position: relative;
+    width: 100%; height: 260px;
+    margin-bottom: 24px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  canvas { width: 100% !important; height: 100% !important; display: block; }
+  #chart { cursor: crosshair; touch-action: pan-y; }
+  .chart-tip {
+    position: absolute; pointer-events: none;
+    background: rgba(13, 19, 32, 0.96);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    padding: 8px 11px;
+    font-size: 12.5px; line-height: 1.6; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  }
+  .radar-box { background: var(--accent-soft); border-color: rgba(245, 184, 61, 0.3); }
+  .radar-box .label { color: var(--accent); }
+  .radar-box p { margin: 6px 0 10px; }
+  .radar-box ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .info-row {
+    display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 12px 16px; font-size: 14px;
+  }
+
+  /* ---------- Vistas ---------- */
+  .view-content { display: none; }
+  .view-content.active { display: block; animation: view-in .25s ease-out; }
+  @keyframes view-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .radar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .radar-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px; cursor: pointer;
+    transition: border-color .2s, background-color .2s;
+  }
+  .radar-card:hover { border-color: rgba(245, 184, 61, 0.4); background: var(--surface-2); }
+  .radar-card .label { display: block; font-size: 12px; color: var(--muted); }
+  .radar-card .value { display: block; font-size: 24px; font-weight: 600; }
+  .radar-card .trend { font-size: 12.5px; color: var(--muted); }
+  .radar-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { font-size: 12px; padding: 3px 8px; border-radius: 6px; background: var(--surface-3); color: var(--muted); }
+  .radar-grid > .empty { grid-column: 1 / -1; }
+
+  .budget-form { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 24px; max-width: 640px; }
+  .form-group { margin-bottom: 20px; }
+  .form-label { display: block; margin-bottom: 8px; color: var(--muted); font-weight: 500; font-size: 14px; }
+  .form-input {
+    width: 100%; min-height: 46px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 10px 14px; font-family: var(--mono); font-size: 16px;
+    outline: none; transition: border-color .2s, box-shadow .2s;
+  }
+  .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .btn-submit {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 46px; padding: 10px 22px;
+    background: var(--accent); color: var(--accent-ink);
+    border: none; border-radius: var(--radius-sm);
+    font-weight: 600; text-decoration: none;
+    cursor: pointer; transition: background-color .2s;
+  }
+  .btn-submit:hover { background: var(--accent-strong); }
+
+
+  /* Índice del mercado */
+  .market-index { margin-bottom: 28px; }
+  .index-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 5px 10px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); font-size: 12.5px; color: var(--muted); }
+  .chip b { font-family: var(--mono); font-weight: 600; }
+  .chip.up b { color: var(--green); }
+  .chip.down b { color: var(--red); }
+  .index-chart { position: relative; height: 170px; padding: 8px 12px 4px; }
+  .index-chart svg { display: block; width: 100%; height: 100%; overflow: visible; cursor: crosshair; touch-action: pan-y; }
+  .index-note { padding: 0 20px 14px; margin: 0; font-size: 12.5px; color: var(--muted); }
+
+  /* Pronóstico en el detalle */
+  .forecast-box { margin-bottom: 20px; }
+  .forecast-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 4px; }
+  .forecast-grid .k { display: block; font-size: 12px; color: var(--muted); }
+  .forecast-grid .v { display: block; font-family: var(--mono); font-size: 18px; font-weight: 600; }
+  .prob-bar { height: 6px; border-radius: 99px; background: var(--surface-3); overflow: hidden; margin-top: 6px; }
+  .prob-bar span { display: block; height: 100%; border-radius: 99px; }
+  .fine { font-size: 12.5px; color: var(--muted); margin: 12px 0 0; }
+
+  /* Comparación de modelos del radar */
+  .models-table td, .models-table th { padding: 10px 16px; }
+  .models-table tbody tr { cursor: default; }
+  .models-table tbody tr:hover { background: transparent; }
+  .badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; background: var(--accent); color: var(--accent-ink); vertical-align: 1px; }
+
+  .note { font-family: var(--font-body); font-size: 11.5px; font-weight: 500; color: var(--faint); white-space: nowrap; }
+  .deal-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; align-items: end; padding: 18px 20px; }
+  .deal-filters .form-group { margin: 0; }
+  .deal-filters .form-input { min-height: 42px; font-size: 15px; }
+  .deal-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 0 20px 16px; }
+  .btn-ghost { min-height: 40px; padding: 8px 14px; background: transparent; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--muted); cursor: pointer; transition: color .2s, border-color .2s; }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+  .callout { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; margin-bottom: 20px; border-radius: var(--radius-sm); background: var(--accent-soft); border: 1px solid rgba(245, 184, 61, 0.3); font-size: 14px; }
+  .callout svg { flex-shrink: 0; color: var(--accent); margin-top: 2px; }
+
+  .empty { padding: 48px 24px; text-align: center; color: var(--muted); }
+  .empty strong { display: block; color: var(--text); font-size: 16px; margin-bottom: 6px; }
+  .hidden { display: none !important; }
+  [hidden] { display: none !important; }
+
+  /* ---------- Responsivo ---------- */
+  @media (max-width: 1024px) {
+    :root { --sidebar-width: 76px; }
+    .logo { justify-content: center; padding: 6px 0 22px; }
+    .logo-text, .nav-item span, .nav-label, .sidebar-footer label { display: none; }
+    .nav-item { justify-content: center; padding: 10px; }
+    .sidebar-footer .hotel-select { padding: 8px 4px; font-size: 12px; }
+    .col-wide { display: none; }
+  }
+  @media (max-width: 767px) {
+    .forecast-grid { grid-template-columns: 1fr 1fr; }
+    .forecast-grid > :last-child { grid-column: 1 / -1; }
+    body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+    /* la barra lateral pasa a ser una barra inferior */
+    .sidebar {
+      position: fixed; top: auto; bottom: 0; left: 0; right: 0;
+      width: 100%; height: auto;
+      flex-direction: row; align-items: center;
+      padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+      border-right: none; border-top: 1px solid var(--border);
+      background: rgba(13, 19, 32, 0.96);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    }
+    .logo, .sidebar-footer { display: none; }
+    .nav-group { flex-direction: row; width: 100%; justify-content: space-around; }
+    .nav-item { flex-direction: column; gap: 2px; padding: 6px 4px; min-height: 52px; font-size: 11px; width: auto; flex: 1; }
+    .nav-item span { display: block; }
+    .top-bar { padding: 0 16px; }
+    .top-actions #meta, .search-wrapper kbd { display: none; }
+    .content-scroll { padding: 20px 16px; }
+    .view-header h1 { font-size: 24px; }
+    .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat-card { padding: 14px; }
+    .stat-card .value { font-size: 20px; }
+    .market-table th, .market-table td { padding: 10px 12px; }
+    .col-spark, .col-hide-sm { display: none; }
+    .furni-name, .furni-key { max-width: 18ch; }
+    .detail-panel { padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); border-left: none; }
+    .section-header { padding: 14px 16px; }
+  }
+  @media (max-width: 340px) {
+    .stats-grid { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="dashboard-root">
+<aside class="sidebar" aria-label="Navegación">
+  <a href="./" class="logo">
+    <div class="logo-icon" aria-hidden="true">H</div>
+    <span class="logo-text">HabboTracker<small id="hotel-sub">Mercadillo</small></span>
+  </a>
+
+  <div class="nav-label">Secciones</div>
+  <nav class="nav-group">
+    <button class="nav-item active" data-view="market" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
+      <span>Mercado</span>
+    </button>
+    <button class="nav-item" data-view="radar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+      <span>Radar</span>
+    </button>
+    <button class="nav-item" data-view="live">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+      <span>En Vivo</span>
+    </button>
+    <button class="nav-item" data-view="launches">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z"></path></svg>
+      <span>Nuevos</span>
+    </button>
+    <button class="nav-item" data-view="deals">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+      <span>Gangas</span>
+    </button>
+    <button class="nav-item" data-view="budget">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="14" rx="2"></rect><path d="M16 13h2"></path><path d="M2 10h20"></path><path d="M6 6V4h12v2"></path></svg>
+      <span>Inversor</span>
+    </button>
+  </nav>
+
+  <div class="sidebar-footer">
+    <label for="hotel-switch">Hotel</label>
+    <select id="hotel-switch" class="hotel-select" aria-label="Cambiar de hotel"></select>
+  </div>
+</aside>
+
+<main class="main-content">
+  <header class="top-bar">
+    <div class="search-wrapper" role="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <label for="q" class="sr-only">Buscar furnis</label>
+      <input type="search" id="q" placeholder="Buscar furni o código" autocomplete="off" spellcheck="false">
+      <kbd aria-hidden="true">/</kbd>
+    </div>
+
+    <div class="top-actions">
+      <div id="live-indicator" class="status-pill" role="status" hidden>
+        <span class="pulse" aria-hidden="true"></span>
+        <span>EN VIVO</span>
+      </div>
+      <div class="status-pill" id="meta">Cargando…</div>
+    </div>
+  </header>
+
+  <div class="content-scroll">
+    <!-- Mercado -->
+    <section id="market-view" class="view-content active" aria-labelledby="market-h">
+      <div class="view-header">
+        <p class="eyebrow" id="hotel-name">Habbo</p>
+        <h1 id="market-h">Mercado</h1>
+        <p id="market-title">Cargando el mercado…</p>
+      </div>
+
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="label">Furnis rastreados</span>
+          <span class="value" id="hero-count">—</span>
+          <span class="trend" id="stat-active">—</span>
+        </div>
+        <div class="stat-card accent">
+          <span class="label" title="Furnis más de 15% abajo de su precio justo">Oportunidades</span>
+          <span class="value" id="opportunity-count">—</span>
+          <span class="trend" id="stat-radar">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="label">Precios en vivo</span>
+          <span class="value" id="stat-live">—</span>
+          <span class="trend" id="stat-live-detail">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="label">Datos del índice</span>
+          <span class="value" id="stat-updated-value">—</span>
+          <span class="trend" id="stat-updated">—</span>
+        </div>
+      </div>
+
+      <div class="data-section market-index" id="market-index" hidden>
+        <div class="section-header">
+          <h2>Índice del mercado</h2>
+          <div class="index-chips" id="index-chips"></div>
+        </div>
+        <div class="index-chart" id="index-chart"></div>
+        <p class="index-note">Precio del furni típico contra su propio nivel de los últimos dos años (base 100). Pasa el mouse para ver cada día.</p>
+      </div>
+
+      <div class="data-section">
+        <div class="section-header">
+          <h2>Resumen del mercado</h2>
+          <div class="controls" id="sort" role="group" aria-label="Ordenar">
+            <button class="btn-filter" data-sort="sold" aria-pressed="true">Más vendidos</button>
+            <button class="btn-filter" data-sort="delta">Más baratos</button>
+            <button class="btn-filter" data-sort="price">Precio</button>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table class="market-table">
+            <thead>
+              <tr>
+                <th scope="col">Furni</th>
+                <th scope="col" class="r">Precio</th>
+                <th scope="col" class="r col-hide-sm">Justo</th>
+                <th scope="col" class="col-spark">30 días</th>
+                <th scope="col" class="r">vs justo</th>
+                <th scope="col" class="r col-hide-sm">Ventas/mes</th>
+              </tr>
+            </thead>
+            <tbody id="list"></tbody>
+          </table>
+        </div>
+        <button type="button" id="more" class="more-btn">Ver más resultados</button>
+      </div>
+    </section>
+
+    <!-- Radar -->
+    <section id="radar-view" class="view-content" aria-labelledby="radar-h">
+      <div class="view-header">
+        <p class="eyebrow">Predicción</p>
+        <h1 id="radar-h">Radar</h1>
+        <p>Furnis cuyas señales solían venir antes de una subida. Se prueba contra el último año y solo recomienda si le gana al mercado con claridad.</p>
+      </div>
+      <div id="radar" class="radar-grid"></div>
+      <div class="data-section" id="radar-models" style="margin-top:24px" hidden></div>
+    </section>
+
+    <!-- En vivo -->
+    <section id="live-view" class="view-content" aria-labelledby="live-h">
+      <div class="view-header">
+        <p class="eyebrow">Tiempo real</p>
+        <h1 id="live-h">En vivo</h1>
+        <p>Los precios más recientes leídos del Mercadillo.</p>
+      </div>
+      <div id="live-list" class="data-section">
+        <div class="table-scroll">
+          <table class="market-table">
+            <thead>
+              <tr>
+                <th scope="col">Furni</th>
+                <th scope="col" class="r">Precio</th>
+                <th scope="col" class="r">Ofertas</th>
+                <th scope="col" class="r">Leído</th>
+              </tr>
+            </thead>
+            <tbody id="live-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Lanzamientos -->
+    <section id="launches-view" class="view-content" aria-labelledby="launches-h">
+      <div class="view-header">
+        <p class="eyebrow">Últimos 30 días</p>
+        <h1 id="launches-h">Lanzamientos</h1>
+        <p>Furnis nuevos y cuánto han bajado desde su máximo.</p>
+      </div>
+      <div id="launches" class="data-section"></div>
+    </section>
+
+    <!-- Gangas en vivo -->
+    <section id="deals-view" class="view-content" aria-labelledby="deals-h">
+      <div class="view-header">
+        <p class="eyebrow">En vivo</p>
+        <h1 id="deals-h">Gangas</h1>
+        <p>Furnis que alguien está vendiendo muy por debajo de su precio justo y que se venden lo bastante seguido para revenderlos pronto. Se revisa con cada precio en vivo.</p>
+      </div>
+      <div class="callout" role="note">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <span>Los precios se leen cada 1–2 minutos en los furnis más vendidos y cada varios minutos en el resto: otra persona puede comprar la ganga antes. Revisa el precio en el juego antes de comprar. La probabilidad de venta no es una suposición: se midió con lo que de verdad pasó en el último año con furnis que se vendían a ese precio igual de seguido. Habbo no muestra el precio de cada oferta de la fila, así que nadie puede darte el tiempo exacto.</span>
+      </div>
+      <form class="data-section" id="deal-form" style="margin-bottom:20px" onsubmit="return false">
+        <div class="section-header"><h2>Tus filtros</h2></div>
+        <div class="deal-filters">
+          <div class="form-group"><label class="form-label" for="f-desc">Descuento mínimo (%)</label><input class="form-input" id="f-desc" type="number" min="0" max="90" step="1" inputmode="numeric"></div>
+          <div class="form-group"><label class="form-label" for="f-gan">Ganancia mínima (créditos)</label><input class="form-input" id="f-gan" type="number" min="0" step="1" inputmode="numeric"></div>
+          <div class="form-group"><label class="form-label" for="f-reventa">Revender a</label>
+            <select class="form-input" id="f-reventa"><option value="1">el precio justo</option><option value="0.95">5% abajo del justo</option><option value="0.9">10% abajo del justo</option></select></div>
+          <div class="form-group"><label class="form-label" for="f-dias">Venderlo en máximo</label>
+            <select class="form-input" id="f-dias"><option value="1">1 día</option><option value="2">2 días</option><option value="3">3 días</option><option value="5">5 días</option><option value="7">7 días</option><option value="14">14 días</option></select></div>
+          <div class="form-group"><label class="form-label" for="f-prob">Con probabilidad mínima</label>
+            <select class="form-input" id="f-prob"><option value="0.4">40%</option><option value="0.5">50%</option><option value="0.6">60%</option><option value="0.7">70%</option><option value="0.8">80%</option></select></div>
+          <div class="form-group"><label class="form-label" for="f-ventas">Ventas mínimas por día</label><input class="form-input" id="f-ventas" type="number" min="0" step="0.5" inputmode="decimal"></div>
+          <div class="form-group"><label class="form-label" for="f-max">Precio máximo (opcional)</label><input class="form-input" id="f-max" type="number" min="0" step="1" inputmode="numeric" placeholder="Sin límite"></div>
+        </div>
+        <div class="deal-actions">
+          <span class="note" id="deals-status" aria-live="polite">Esperando precios en vivo…</span>
+          <button type="button" class="btn-ghost" id="deal-reset">Valores de inicio</button>
+        </div>
+      </form>
+      <div class="data-section" id="deals"></div>
+    </section>
+
+    <!-- Inversor -->
+    <section id="budget-view" class="view-content" aria-labelledby="budget-h">
+      <div class="view-header">
+        <p class="eyebrow">Presupuesto</p>
+        <h1 id="budget-h">Inversor</h1>
+        <p>Arma una lista de compras con tus créditos: furnis abajo de su precio justo que se revenden rápido.</p>
+      </div>
+      <form class="budget-form" id="budget-form" onsubmit="return false">
+        <div class="form-group">
+          <label class="form-label" for="budget">Tu presupuesto (créditos)</label>
+          <input type="number" id="budget" class="form-input" placeholder="Ej. 500" min="1" inputmode="numeric">
+        </div>
+        <div class="form-group">
+          <span class="form-label" id="budget-days-label">Tiempo máximo de reventa</span>
+          <div class="controls" id="budget-days" role="group" aria-labelledby="budget-days-label">
+            <button type="button" class="btn-filter" data-days="3">3 días</button>
+            <button type="button" class="btn-filter" data-days="7" aria-pressed="true">7 días</button>
+            <button type="button" class="btn-filter" data-days="14">14 días</button>
+          </div>
+        </div>
+        <button type="submit" id="budget-go" class="btn-submit">Calcular inversión</button>
+      </form>
+      <div id="budget-out" aria-live="polite"></div>
+    </section>
+  </div>
+</main>
+
+<!-- Detalle de un furni -->
+<div class="overlay" id="overlay" inert>
+  <div class="detail-panel" role="dialog" aria-modal="true" aria-labelledby="detail-name">
+    <div class="detail-header">
+      <div class="detail-title">
+        <div class="furni-icon"><img id="detail-icon" alt="" style="visibility:hidden"></div>
+        <div style="min-width:0">
+          <h2 id="detail-name">Furni</h2>
+          <span id="detail-key">—</span>
+        </div>
+      </div>
+      <button class="close-btn" id="back" aria-label="Cerrar detalle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <span class="label">Precio actual</span>
+        <span class="value" id="detail-price">—</span>
+      </div>
+      <div class="stat-card">
+        <span class="label">Precio justo</span>
+        <span class="value" id="detail-fair">—</span>
+        <span class="trend" id="detail-fair-note" hidden></span>
+      </div>
+    </div>
+
+    <div class="panel-heading">
+      <h2>Historial de precios</h2>
+      <div class="controls" id="range" role="group" aria-label="Periodo">
+        <button class="btn-filter" data-days="7" aria-pressed="true">7d</button>
+        <button class="btn-filter" data-days="30">30d</button>
+        <button class="btn-filter" data-days="90">90d</button>
+        <button class="btn-filter" data-days="365">1a</button>
+        <button class="btn-filter" data-days="0">Todo</button>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <canvas id="chart" role="img" aria-label="Gráfica del precio medio por día"></canvas>
+      <div id="chart-tip" class="chart-tip" hidden></div>
+    </div>
+
+    <div id="forecast-box" class="stat-card forecast-box" hidden></div>
+
+    <div id="radar-box" class="stat-card radar-box" hidden>
+      <span class="label">Radar</span>
+      <p><strong></strong></p>
+      <ul></ul>
+    </div>
+
+    <div id="detail-extra" style="margin-top:20px;"></div>
+  </div>
+</div>
+
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => n?.toLocaleString();
+  const esc = (t) => { const e = document.createElement("div"); e.textContent = t; return e.innerHTML; };
+  const store = { get: (k) => localStorage.getItem(k), set: (k, v) => localStorage.setItem(k, v) };
+  
+  let index, all = [], byKey = new Map(), current = null, live = null;
+  let view = "market", sortMode = "sold", shown = 50, rangeDays = 7, budgetDays = 7;
+  const PAGE = 50, LIVE_EVERY = 15000;   // en_vivo.py reescribe vivo.json cada 10 s
+
+  function ago(ts) {
+    if (!ts) return "nunca";
+    const d = new Date(ts);
+    const diff = (Date.now() - d.getTime()) / 1000;
+    if (diff < 60) return "ahora";
+    if (diff < 3600) return `hace ${Math.round(diff / 60)}m`;
+    if (diff < 86400) return `hace ${Math.round(diff / 3600)}h`;
+    return `hace ${Math.round(diff / 86400)}d`;
+  }
+  function agoShort(ts) {
+    const d = new Date(ts);
+    const diff = (Date.now() - d.getTime()) / 1000;
+    if (diff < 60) return `${Math.round(diff)}s`;
+    return `${Math.round(diff / 60)}m`;
+  }
+  function daysAgo(iso) { return Math.floor((Date.now() - new Date(iso)) / 86400000); }
+  const fileName = (c) => c.replace(/\*/g, "~").replace(/[^A-Za-z0-9_.\-~]/g, "-");
+  function pct(v) { return (v > 0 ? "+" : "") + Math.round(v * 100) + "%"; }
+  function pct1(v) { return (v > 0 ? "+" : "") + (v * 100).toFixed(1) + "%"; }
+
+  // Icono del furni: images.habbo.com/dcr/hof_furni/<revisión>/<classname>_icon.png
+  // (la revisión sale del catálogo de Habbo y llega en s.r). Si falla, se prueba con la clase base
+  // (sin el *color) y, si tampoco, se muestra un recuadro vacío en vez de una imagen rota.
+  function getIcon(s) {
+    if (!s) return "";
+    const c = s.c || (s.key ? s.key.split(":")[1] : "");
+    if (!c || !s.r) return "";
+    return `https://images.habbo.com/dcr/hof_furni/${s.r}/${c.replace(/\*/g, "_")}_icon.png`;
+  }
+  function getIconAlt(s) {
+    if (!s) return "";
+    const c = s.c || (s.key ? s.key.split(":")[1] : "");
+    if (!c || !s.r || !c.includes("*")) return "";
+    return `https://images.habbo.com/dcr/hof_furni/${s.r}/${c.split("*")[0]}_icon.png`;
+  }
+  function iconAttrs(s) {
+    const src = getIcon(s), alt = getIconAlt(s);
+    if (!src) return 'style="visibility:hidden"';
+    return `src="${src}" data-alt="${alt}" referrerpolicy="no-referrer"`;
+  }
+  document.addEventListener("error", (ev) => {
+    const img = ev.target;
+    if (!(img instanceof HTMLImageElement) || !img.closest(".furni-icon")) return;
+    const alt = img.dataset.alt;
+    if (alt && img.src !== alt) { img.src = alt; img.dataset.alt = ""; }
+    else img.style.visibility = "hidden";
+  }, true);
+
+  function enrich(k, e) {
+    const s = { key: k, ...e };
+    s.name = s.n;
+    s.price = s.p;
+    s.sold = s.s || 0;
+    s.offers = s.o;
+    s.fair = s.m;
+    s.spark = s.sp || [];
+    s.launched = s.f;
+    s.perDay = s.sold / 30;
+    s.hasFair = s.fair != null;
+    s.fairIssue = fairIssue(s);
+    s.fairOk = s.hasFair && !s.fairIssue;
+    s.delta = s.price && s.fair ? (s.price - s.fair) / s.fair : null;
+    s.q = `${s.name || ""} ${k}`.toLowerCase();
+    if (index.live) applyLiveTo(s);
+    return s;
+  }
+
+  function applyLiveTo(s) {
+    if (!live || !live.items) return false;
+    const v = live.items[s.key];
+    if (!v) return false;
+    const [p, o, age] = v;
+    s.price = p || null;
+    if (o != null) s.offers = o;
+    s.delta = s.price && s.fair ? (s.price - s.fair) / s.fair : null;
+    s.liveAt = (live.t - age) * 1000;
+    return true;
+  }
+
+  // Minigráfica de los últimos 30 días con ventas (s.sp): verde si terminó arriba de donde empezó.
+  function sparkSvg(sp) {
+    const v = (sp || []).filter(Boolean);
+    if (v.length < 2) return `<span style="color:var(--muted)">—</span>`;
+    const W = 96, H = 28, lo = Math.min(...v), hi = Math.max(...v), r = hi - lo || 1;
+    const pts = v.map((p, i) => `${(i / (v.length - 1) * W).toFixed(1)},${(H - 2 - (p - lo) / r * (H - 4)).toFixed(1)}`).join(" ");
+    const color = v[v.length - 1] >= v[0] ? "var(--green)" : "var(--red)";
+    return `<svg class="spark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
+  }
+
+  // Los raros casi nunca tienen ofertas abiertas (Habbo da precio 0) y se venden poco: se dice así en vez de "—".
+  const noOfferHtml = `<span class="note" title="Nadie lo está vendiendo en este momento">sin ofertas</span>`;
+  // Un precio justo solo sirve para comparar si sale de varias ventas en varios días y el mercado lo respalda.
+  // La Esquina Anna Verde (a 3 créditos) llegó a mostrar un justo de 780 por una sola venta vieja.
+  function fairIssue(s) {
+    if (s.fair == null) return null;
+    if (s.mq) return "Las ofertas de la última semana estuvieron muy abajo de este precio: las ventas caras parecen casos raros, no el precio normal.";
+    if (s.mw) return "Sin ventas en 30 días: es la mediana del último año.";
+    const days = (s.spark || []).length;
+    if (s.sold < 5 || days < 3) return `Solo ${s.sold} venta${s.sold === 1 ? "" : "s"} en ${days} día${days === 1 ? "" : "s"} del último mes.`;
+    return null;
+  }
+  const fairHtml = (s) => s.fair
+    ? `${fmt(s.fair)}${s.fairIssue ? ` <span class="note" title="${esc(s.fairIssue)}">${s.mw && !s.mq ? "1 año" : "dudoso"}</span>` : ""}`
+    : "—";
+  function rowHtml(s) {
+    const deltaClass = !s.delta || !s.fairOk ? "flat" : s.delta < -0.05 ? "down" : s.delta > 0.05 ? "up" : "flat";
+    // delta 0 (precio igual al justo) es un dato válido: "0%", no "sin justo"
+    const deltaText = s.fairIssue && !s.mw && s.delta != null ? "dudoso"
+      : s.delta != null ? pct(s.delta) : !s.price ? "sin oferta" : "sin justo";
+    return `<tr data-key="${s.key}" tabindex="0">
+      <td>
+        <div class="furni-cell">
+          <div class="furni-icon"><img ${iconAttrs(s)} alt="" loading="lazy" width="32" height="32"></div>
+          <div style="min-width:0"><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div>
+        </div>
+      </td>
+      <td class="r"><span class="price-val">${s.price ? fmt(s.price) : noOfferHtml}</span></td>
+      <td class="r col-hide-sm"><span class="price-val" style="color:var(--muted)">${fairHtml(s)}</span></td>
+      <td class="col-spark">${sparkSvg(s.spark)}</td>
+      <td class="r"><span class="delta-pill ${deltaClass}"${s.fairIssue ? ` title="${esc(s.fairIssue)}"` : ""}>${deltaText}</span></td>
+      <td class="r col-hide-sm"><span class="num">${fmt(s.sold)}</span></td>
+    </tr>`;
+  }
+
+  function renderList() {
+    const q = $("q").value.trim().toLowerCase();
+    let rows = q ? all.filter((s) => s.q.includes(q)) : all.slice();
+    if (sortMode === "sold") rows.sort((a, b) => b.sold - a.sold);
+    if (sortMode === "price") rows.sort((a, b) => (b.price || 0) - (a.price || 0));
+    // los de precio justo dudoso van al final: si no, un justo inventado (−99%) encabezaba la lista
+    if (sortMode === "delta") rows.sort((a, b) => (b.fairOk - a.fairOk) || (a.delta ?? Infinity) - (b.delta ?? Infinity));
+    
+    const page = rows.slice(0, shown);
+    $("list").innerHTML = page.map((s) => rowHtml(s)).join("");
+    $("more").hidden = shown >= rows.length;
+    
+    const opportunities = all.filter(s => s.fairOk && s.delta && s.delta < -0.15).length;
+    $("opportunity-count").textContent = opportunities;
+  }
+
+  function bindRows(el) {
+    el.querySelectorAll("tr").forEach((tr) => {
+      tr.addEventListener("click", () => {
+        const s = all.find((x) => x.key === tr.dataset.key);
+        if (s) { current = s; location.hash = s.key; }
+      });
+    });
+  }
+  const observer = new MutationObserver(() => bindRows($("list")));
+  observer.observe($("list"), { childList: true });
+
+  $("more").addEventListener("click", () => { shown += PAGE; renderList(); });
+
+  // ---- Radar AI ----
+  let prediction = null;
+  async function loadPrediction() {
+    if (prediction) return;
+    try {
+      const r = await fetch("prediccion.json");
+      prediction = await r.json();
+    } catch (e) { prediction = { items: {} }; }
+  }
+
+  function radarPick(key) {
+    const p = (prediction.picks || []).find(x => x.k === key);
+    if (!p) return null;
+    return { expected: p.expected, why: p.why };
+  }
+
+  const MODEL_NAMES = { lineal: "Señales lineales", xgboost: "XGBoost", mezcla: "Mezcla de ambos" };
+  function renderModels() {
+    const pr = prediction || {}, box = $("radar-models");
+    if (!pr.models) { box.hidden = true; return; }
+    const rows = Object.entries(pr.models).map(([name, m]) => `<tr>
+        <td>${esc(MODEL_NAMES[name] || name)}${name === pr.model ? '<span class="badge">en uso</span>' : ""}</td>
+        <td class="r num" style="color:${m.picks_ret >= 0 ? "var(--green)" : "var(--red)"}">${pct1(m.picks_ret)}</td>
+        <td class="r num col-hide-sm">${pct1(m.excess)}</td>
+        <td class="r num">${Math.round(m.beat_share * 100)}%</td>
+        <td class="r num col-hide-sm">${Math.round(m.hit_rate * 100)}%</td>
+        <td class="r num col-hide-sm">${m.t_stat.toFixed(1)}</td>
+      </tr>`).join("");
+    box.innerHTML = `<div class="section-header"><h2>Cómo le fue a cada modelo</h2></div>
+      <div class="table-scroll"><table class="market-table models-table">
+        <thead><tr><th scope="col">Modelo</th><th scope="col" class="r">Ganancia</th><th scope="col" class="r col-hide-sm">vs mercado</th>
+          <th scope="col" class="r">Semanas que gana</th><th scope="col" class="r col-hide-sm">Aciertos</th><th scope="col" class="r col-hide-sm">Confianza (t)</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>
+      <p class="index-note" style="padding-top:12px">Prueba de ${pr.test_weeks} semanas (${esc(pr.test_from || "")} a ${esc(pr.test_to || "")}) sin mirar el futuro:
+        cada semana se compran los ${pr.top_n} mejores en los 3 días siguientes y se venden ${pr.horizon_days} días después, ya con ${pr.fee_pct}% de comisión.
+        El mercado hizo ${pct1(pr.market_ret)} en el mismo tiempo. Otro modelo reemplaza a las señales lineales solo si les gana en las dos mitades de la prueba.</p>`;
+    box.hidden = false;
+  }
+
+  async function renderRadar() {
+    await loadPrediction();
+    renderModels();
+    const picks = (prediction.picks || []).map(p => {
+      const s = all.find(x => x.key === p.k);
+      return s ? { ...s, ...p } : null;
+    }).filter(x => x && x.expected > 0.02)
+      .sort((a, b) => b.expected - a.expected);
+    
+    if (!picks.length) {
+      const pr = prediction || {};
+      const detail = pr.test_weeks
+        ? `El modelo en uso (${esc(MODEL_NAMES[pr.model] || "señales lineales")}) hizo ${pct1(pr.picks_ret)} contra ${pct1(pr.market_ret)} del mercado a ${pr.horizon_days} días ` +
+          `y acertó ${Math.round((pr.hit_rate || 0) * 100)}% de sus compras. Solo se publican recomendaciones cuando además dejan ganancia ` +
+          `(más de 1 punto arriba del mercado, más de la mitad de aciertos y le gana al menos 60% de las semanas).`
+        : (pr.reason || "El radar necesita más datos históricos para generar predicciones confiables.");
+      $("radar").innerHTML = `<div class="empty"><strong>Sin recomendaciones por ahora</strong>${detail}</div>`;
+      return;
+    }
+
+    $("radar").innerHTML = picks.slice(0, 12).map((s) => {
+      return `<div class="radar-card" role="link" tabindex="0" onclick="location.hash='${s.key}'">
+        <div class="furni-cell" style="margin-bottom:14px">
+          <div class="furni-icon"><img ${iconAttrs(s)} alt=""></div>
+          <div style="min-width:0"><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div>
+        </div>
+        <div class="label">Subida estimada</div>
+        <div class="value" style="color:var(--green)">${pct1(s.expected)}</div>
+        <div class="trend">en ${prediction.horizon_days} días</div>
+        <div class="radar-tags" style="margin-top:12px">
+          ${(s.why || []).map(w => `<span class="tag">${esc(w)}</span>`).join("")}
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  // ---- Tiempo de venta: medido, no supuesto ----
+  // prediccion.py mide con el último año: de los casos en que un furni se vendió a cierto precio o más en
+  // k de sus últimos 30 días, ¿en cuántos se volvió a vender a ese precio dentro de 1, 2, 3, 5, 7 y 14 días?
+  // Aquí se cuenta k para el furni y se lee esa tabla. Antes se usaba ofertas ÷ ventas por día, que suponía
+  // que tu oferta era la primera de la fila: decía "1 día" y solo 43% se vendía en un día.
+  const histCache = new Map();
+  function loadHist(s) {
+    if (!histCache.has(s.key)) {
+      histCache.set(s.key, fetch(`h/${s.t}/${fileName(s.c)}.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+    }
+    return histCache.get(s.key);
+  }
+  function sellOdds(hist, price) {
+    const cal = prediction && prediction.sell_time;
+    if (!cal || !hist || !hist.d) return null;
+    const dates = Object.keys(hist.d).sort();
+    if (!dates.length) return null;
+    const last = Date.parse(dates.at(-1) + "T00:00:00Z");
+    let k = 0;
+    for (let i = 0; i < 30; i++) {
+      const v = hist.d[new Date(last - i * DAY).toISOString().slice(0, 10)];
+      if (v && v[0] && v[0] >= price) k++;
+    }
+    // la tabla viene por décimas de k/30: se interpola entre los centros de las dos más cercanas
+    const x = Math.max(0, Math.min(cal.bins - 1, (k / 30) * cal.bins - 0.5));
+    const i0 = Math.floor(x), i1 = Math.min(cal.bins - 1, i0 + 1), w = x - i0;
+    const p = cal.p[i0].map((v, j) => v * (1 - w) + cal.p[i1][j] * w);
+    return { k, p, horizons: cal.horizons };
+  }
+  // probabilidad de venderlo en `days` días o menos (solo plazos medidos; entre dos, el menor)
+  function probWithin(o, days) {
+    let p = 0;
+    o.horizons.forEach((h, i) => { if (h <= days) p = o.p[i]; });
+    return p;
+  }
+  // el plazo en que ya es más probable que sí que no
+  function typicalWait(o) {
+    const i = o.p.findIndex((v) => v >= 0.5);
+    return i < 0 ? `más de ${o.horizons.at(-1)} d` : `~${o.horizons[i]} d`;
+  }
+  const pctTone = (p) => (p >= 0.6 ? "var(--green)" : p < 0.4 ? "var(--red)" : "var(--accent)");
+
+  async function renderSellOdds(s, hist) {
+    await loadPrediction();
+    const box = $("sell-odds");
+    if (!box || current !== s) return;
+    const o = sellOdds(hist, s.fair);
+    if (!o) { box.querySelector(".value").textContent = "Sin datos"; box.querySelector(".trend").textContent = "No hay historial suficiente"; return; }
+    const p1 = probWithin(o, 1), p7 = probWithin(o, 7);
+    box.querySelector(".value").innerHTML = `<span style="color:${pctTone(p1)}">${Math.round(p1 * 100)}%</span> en 1 día`;
+    box.querySelector(".trend").textContent = `${Math.round(p7 * 100)}% en 7 días. Se vendió a ${fmt(s.fair)} o más en ${o.k} de los últimos 30 días.`;
+  }
+
+  // ---- Gangas en vivo ----
+  // Cada visitante ajusta sus filtros; los valores de inicio vienen de avisos.json (vigia).
+  const DEAL_KEY = "gangas-filtros";
+  function dealDefaults() {
+    const g = (index && index.gangas) || {};
+    return { desc: g.descuento_pct ?? 15, gan: g.ganancia ?? 20, dias: g.dias ?? 1, ventas: g.ventas_dia ?? 2, max: "",
+             reventa: 1, prob: 0.5 };
+  }
+  function dealFilters() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(DEAL_KEY) || "{}"); } catch (e) {}
+    return { ...dealDefaults(), ...saved };
+  }
+  function fillDealForm() {
+    const f = dealFilters();
+    $("f-desc").value = f.desc; $("f-gan").value = f.gan; $("f-dias").value = String(f.dias);
+    $("f-ventas").value = f.ventas; $("f-max").value = f.max;
+    $("f-reventa").value = String(f.reventa); $("f-prob").value = String(f.prob);
+    if (!$("f-dias").value) $("f-dias").value = "1";   // un valor guardado que ya no existe (antes había "medio día")
+  }
+  function saveDealForm() {
+    const f = { desc: Number($("f-desc").value) || 0, gan: Number($("f-gan").value) || 0, dias: Number($("f-dias").value) || 1,
+                ventas: Number($("f-ventas").value) || 0, max: $("f-max").value ? Number($("f-max").value) : "",
+                reventa: Number($("f-reventa").value) || 1, prob: Number($("f-prob").value) || 0.5 };
+    try { localStorage.setItem(DEAL_KEY, JSON.stringify(f)); } catch (e) {}
+    renderDeals();
+  }
+  ["f-desc", "f-gan", "f-dias", "f-ventas", "f-max", "f-reventa", "f-prob"].forEach((id) => $(id).addEventListener("input", saveDealForm));
+  $("deal-reset").addEventListener("click", () => {
+    try { localStorage.removeItem(DEAL_KEY); } catch (e) {}
+    fillDealForm(); renderDeals();
+  });
+
+  function findDeals(f) {
+    if (!live || !live.items) return [];
+    const fee = Number(index.fee_pct ?? 1) / 100;
+    const now = Date.now();
+    const out = [];
+    for (const k of Object.keys(live.items)) {
+      const s = byKey.get(k);
+      // sin precio justo del mes (raros) o recién lanzado: no hay contra qué comparar con confianza
+      if (!s || !s.price || !s.fairOk || s.launched || !s.liveAt) continue;
+      if (s.perDay < f.ventas || (f.max && s.price > f.max)) continue;
+      const resale = Math.round(s.fair * f.reventa);
+      const profit = Math.round(resale * (1 - fee) - s.price);
+      const disc = 1 - s.price / s.fair;
+      if (disc * 100 < f.desc || profit < f.gan) continue;
+      out.push({ s, resale, profit, disc, age: Math.max(0, Math.round((now - s.liveAt) / 1000)) });
+    }
+    return out.sort((a, b) => b.profit - a.profit);
+  }
+
+  let dealsRun = 0;
+  async function renderDeals() {
+    if (!index) return;
+    const status = $("deals-status");
+    if (!index.live) { status.textContent = "Este hotel no tiene precios en vivo."; $("deals").innerHTML = ""; return; }
+    if (!live) { status.textContent = "Esperando precios en vivo…"; $("deals").innerHTML = ""; return; }
+    const run = ++dealsRun, f = dealFilters();
+    await loadPrediction();
+    // la probabilidad de venta necesita el historial de cada candidato (se guarda: se baja una vez por furni)
+    const cands = findDeals(f).slice(0, 60);
+    const hists = await Promise.all(cands.map((d) => loadHist(d.s)));
+    if (run !== dealsRun) return;   // llegó una actualización más nueva mientras se bajaban
+    const deals = [];
+    cands.forEach((d, i) => {
+      const o = sellOdds(hists[i], d.resale);
+      if (!o) return;
+      d.odds = o; d.p = probWithin(o, f.dias);
+      if (d.p >= f.prob) deals.push(d);
+    });
+    status.textContent = `${fmt(Object.keys(live.items).length)} precios en vivo revisados · ${deals.length} ganga${deals.length === 1 ? "" : "s"} · se actualiza cada 15 s`;
+    if (!deals.length) {
+      $("deals").innerHTML = `<div class="empty"><strong>Ninguna ganga con tus filtros ahora mismo</strong>${cands.length
+        ? `Hay ${cands.length} furni${cands.length === 1 ? "" : "s"} con descuento, pero ninguno se vendió lo bastante seguido a ese precio para venderlo en ${f.dias} día${f.dias == 1 ? "" : "s"} con ${Math.round(f.prob * 100)}% de probabilidad. Prueba revender un poco abajo del justo o dar más días.`
+        : "Prueba bajar el descuento o la ganancia mínima."}</div>`;
+      return;
+    }
+    $("deals").innerHTML = `<div class="table-scroll"><table class="market-table"><thead><tr>
+        <th scope="col">Furni</th><th scope="col" class="r">Compra a</th><th scope="col" class="r col-hide-sm">Revende a</th>
+        <th scope="col" class="r">Ganancia</th><th scope="col" class="r">Venta en ≤${f.dias} d</th><th scope="col" class="r col-hide-sm">Normalmente</th><th scope="col" class="r col-hide-sm">Leído</th></tr></thead>
+      <tbody>${deals.slice(0, 100).map(({ s, resale, profit, disc, age, p, odds }) => `<tr data-key="${s.key}" tabindex="0">
+        <td><div class="furni-cell"><div class="furni-icon"><img ${iconAttrs(s)} alt=""></div>
+          <div style="min-width:0"><span class="furni-name">${esc(s.name)}</span><span class="furni-key" title="Se vendió a ${fmt(resale)} o más en ${odds.k} de los últimos 30 días">${Math.round(disc * 100)}% abajo · a ese precio ${odds.k}/30 días</span></div></div></td>
+        <td class="r"><span class="price-val">${fmt(s.price)}</span></td>
+        <td class="r col-hide-sm"><span class="price-val" style="color:var(--muted)">${fmt(resale)}</span></td>
+        <td class="r"><span class="delta-pill down">+${fmt(profit)}</span></td>
+        <td class="r num" style="color:${pctTone(p)}">${Math.round(p * 100)}%</td>
+        <td class="r num col-hide-sm">${typicalWait(odds)}</td>
+        <td class="r num col-hide-sm" style="color:var(--muted)">${age < 60 ? age + " s" : Math.round(age / 60) + " min"}</td>
+      </tr>`).join("")}</tbody></table></div>`;
+    bindRows($("deals"));
+  }
+
+  // ---- Live View ----
+  function renderLiveTab() {
+    if (!live || !live.items) {
+       $("live-rows").innerHTML = `<tr><td colspan="4" class="empty">Esperando datos en vivo…</td></tr>`;
+       return;
+    }
+    const entries = Object.entries(live.items)
+      .map(([k, v]) => ({ key: k, price: v[0], offers: v[1], age: v[2] }))
+      .sort((a, b) => a.age - b.age);
+    
+    const lag = Math.max(0, Math.round(Date.now() / 1000 - (live.t || 0)));
+    $("live-rows").innerHTML = entries.slice(0, 50).map((e) => {
+      const s = all.find(x => x.key === e.key) || { name: "Furni desconocido", c: e.key.split(":")[1] };
+      const secs = e.age + lag;
+      return `<tr tabindex="0" onclick="location.hash='${e.key}'">
+        <td><div class="furni-cell">
+          <div class="furni-icon"><img ${iconAttrs(s)} alt=""></div>
+          <div style="min-width:0"><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c || e.key.split(":")[1])}</span></div>
+        </div></td>
+        <td class="r"><span class="price-val">${e.price ? fmt(e.price) : "—"}</span></td>
+        <td class="r num">${e.offers != null ? fmt(e.offers) : "—"}</td>
+        <td class="r num" style="color:var(--muted)">${secs < 60 ? secs + " s" : Math.round(secs / 60) + " min"}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  // ---- Launches ----
+  function renderLaunches() {
+    const rows = all.filter((s) => s.launched).sort((a, b) => b.launched.localeCompare(a.launched) || b.sold - a.sold);
+    if (!rows.length) {
+      $("launches").innerHTML = `<div class="empty"><strong>Sin lanzamientos recientes</strong></div>`;
+      return;
+    }
+    $("launches").innerHTML = `<div class="table-scroll"><table class="market-table"><thead><tr><th scope="col">Furni</th><th scope="col">Salió</th><th scope="col" class="r col-hide-sm">Ventas/mes</th><th scope="col" class="r">Estado</th></tr></thead>
+      <tbody>${rows.map(s => {
+        const age = daysAgo(s.launched);
+        const when = age <= 0 ? "Hoy" : age === 1 ? "Ayer" : `${age}d`;
+        const peak = s.spark?.length ? Math.max(...s.spark) : null;
+        let state = '<span class="delta-pill flat">estable</span>';
+        if (peak && s.price) {
+          const d = (s.price - peak) / peak;
+          state = d < -0.02 ? `<span class="delta-pill down">−${Math.abs(Math.round(d * 100))}% vs máx</span>` : `<span class="delta-pill up">en su máximo</span>`;
+        }
+        return `<tr tabindex="0" onclick="location.hash='${s.key}'">
+          <td><div class="furni-cell"><div class="furni-icon"><img ${iconAttrs(s)} alt=""></div><div style="min-width:0"><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div></div></td>
+          <td style="white-space:nowrap">${when}</td>
+          <td class="r num col-hide-sm">${fmt(s.sold)}</td>
+          <td class="r">${state}</td>
+        </tr>`;
+      }).join("")}</tbody></table></div>`;
+  }
+
+  // ---- Pronóstico de 14 días (pronostico.json, lo calcula prediccion.py) ----
+  let forecast = null;
+  async function loadForecast() {
+    if (forecast) return forecast;
+    try {
+      const r = await fetch("pronostico.json");
+      forecast = r.ok ? await r.json() : { items: {} };
+    } catch (e) { forecast = { items: {} }; }
+    return forecast;
+  }
+  const forecastFor = (s) => (forecast && s && forecast.items && forecast.items[s.key]) || null;
+
+  // Probabilidad de que el precio en 14 días, ya con comisión, supere lo que pagas hoy. Interpola entre los
+  // percentiles en escala logarítmica, igual que prediccion.py al medir qué tan bien calibrado salió.
+  function probProfit(q, price, feePct) {
+    const levels = forecast.quantiles || [0.1, 0.25, 0.5, 0.75, 0.9];
+    const th = Math.log(price / (1 - feePct / 100)), lq = q.map(Math.log);
+    if (th <= lq[0]) return 0.95;
+    if (th >= lq[lq.length - 1]) return 0.05;
+    for (let i = 0; i < lq.length - 1; i++) {
+      if (th <= lq[i + 1]) return 1 - (levels[i] + (levels[i + 1] - levels[i]) * (th - lq[i]) / ((lq[i + 1] - lq[i]) || 1));
+    }
+    return 0.05;
+  }
+
+  function renderForecast(s) {
+    const box = $("forecast-box"), q = forecastFor(s);
+    if (!q) {
+      box.hidden = !forecast;
+      box.innerHTML = `<span class="label">Pronóstico a 14 días</span><p class="fine" style="margin-top:4px">Sin pronóstico: solo se calcula para furnis que se venden al menos 10 veces al mes.</p>`;
+      return;
+    }
+    const fee = Number(index.fee_pct ?? forecast.fee_pct ?? 1);
+    const price = s.price || q[2];
+    const p = probProfit(q, price, fee);
+    const color = p >= 0.6 ? "var(--green)" : p <= 0.4 ? "var(--red)" : "var(--accent)";
+    const rep = forecast.report;
+    box.innerHTML = `<span class="label">Pronóstico a ${forecast.horizon_days || 14} días</span>
+      <div class="forecast-grid">
+        <div><span class="k">Lo más probable</span><span class="v">${fmt(q[2])}</span></div>
+        <div><span class="k">Rango probable (80%)</span><span class="v">${fmt(q[0])}–${fmt(q[4])}</span></div>
+        <div><span class="k">Probabilidad de ganar comprando a ${fmt(price)}</span><span class="v" style="color:${color}">${Math.round(p * 100)}%</span>
+          <div class="prob-bar" aria-hidden="true"><span style="width:${Math.round(p * 100)}%;background:${color}"></span></div></div>
+      </div>
+      <p class="fine">Ya con ${fee}% de comisión. Modelo XGBoost por cuantiles${rep ? `: en semanas que no vio, el precio real cayó dentro del rango ${Math.round(rep.coverage80 * 100)}% de las veces` : ""}.
+        Es una estimación, no una garantía.</p>`;
+    box.hidden = false;
+  }
+
+  // ---- Detail & Chart ----
+  let currentHistory = null, chartState = null, hoverIdx = null;
+  const DAY = 86400000;
+  const fmtDate = (t) => new Date(t).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+
+  // Puntos del periodo elegido: con fecha si ya llegó el historial, si no la minigráfica de 30 días.
+  function chartData() {
+    if (currentHistory && currentHistory.d) {
+      const rows = Object.entries(currentHistory.d)
+        .map(([date, v]) => ({ t: Date.parse(date + "T00:00:00Z"), avg: v[0], sold: v[1], offers: v[2], low: v[3] }))
+        .filter((x) => x.avg)
+        .sort((a, b) => a.t - b.t);
+      if (!rows.length || !rangeDays) return rows;
+      const from = rows[rows.length - 1].t - (rangeDays - 1) * DAY;
+      return rows.filter((x) => x.t >= from);
+    }
+    const sp = (current.spark || []).filter(Boolean);
+    return sp.slice(-rangeDays || undefined).map((avg, i) => ({ t: null, i, avg }));
+  }
+
+  function drawChart() {
+    const canvas = $("chart"), ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const w = rect.width, h = rect.height;
+    ctx.clearRect(0, 0, w, h);
+    chartState = null;
+    $("chart-tip").hidden = true;
+
+    if (!current) return;
+    const data = chartData();
+    if (data.length < 2) {
+      ctx.fillStyle = "#94a3b8"; ctx.textAlign = "center"; ctx.font = "13px 'Fira Sans', sans-serif";
+      ctx.fillText(currentHistory ? "Sin ventas suficientes en este periodo" : "Cargando historial…", w / 2, h / 2);
+      return;
+    }
+
+    const dated = data[0].t != null;
+    // el pronóstico se dibuja a la derecha, 14 días después del último dato (no en el rango de 7 días: lo aplastaría)
+    const fq = dated && rangeDays !== 7 ? forecastFor(current) : null;
+    const fcT = fq ? data[data.length - 1].t + (forecast.horizon_days || 14) * DAY : null;
+    const prices = data.map((x) => x.avg);
+    data.forEach((d) => { if (d.low) prices.push(d.low); });
+    if (current.fair) prices.push(current.fair);
+    if (fq) prices.push(fq[0], fq[4]);
+    let minP = Math.min(...prices), maxP = Math.max(...prices);
+    // un precio plano (7, 7, 7…) dejaba el eje en 6.7–7.3 y las cinco marcas decían "7": se abre al menos 4 créditos
+    const minSpan = Math.max(4, maxP * 0.06);
+    if (maxP - minP < minSpan) { const mid = (maxP + minP) / 2; minP = mid - minSpan / 2; maxP = mid + minSpan / 2; }
+    const pad = (maxP - minP) * 0.08;
+    minP = Math.max(0, minP - pad); maxP += pad;
+
+    const margin = { top: 24, right: 16, bottom: 36, left: 52 };
+    const chartW = w - margin.left - margin.right;
+    const chartH = h - margin.top - margin.bottom;
+    const t0 = dated ? data[0].t : 0, t1 = fcT || (dated ? data[data.length - 1].t : data.length - 1);
+    const getX = (d) => margin.left + (((dated ? d.t : d.i) - t0) / (t1 - t0 || 1)) * chartW;
+    const getY = (p) => margin.top + chartH - ((p - minP) / (maxP - minP)) * chartH;
+
+    // Rejilla y precios
+    ctx.font = "11px 'Fira Code', monospace";
+    ctx.lineWidth = 1;
+    ctx.textAlign = "right";
+    [0, 0.25, 0.5, 0.75, 1].forEach((f) => {
+      const p = minP + f * (maxP - minP), y = getY(p);
+      ctx.strokeStyle = "#1a2436";
+      ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(w - margin.right, y); ctx.stroke();
+      ctx.fillStyle = "#94a3b8";
+      ctx.fillText(fmt(Math.round(p)), margin.left - 8, y + 3);
+    });
+
+    // Fechas: marcas repartidas por tiempo, no por número de puntos
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#94a3b8";
+    const span = t1 - t0;
+    // con pocos días, una marca por día como mucho: si no, salía "13 oct, 13 oct, 13 oct"
+    const ticks = Math.max(1, Math.min(5, Math.floor(chartW / 90), dated ? Math.round(span / DAY) : 5));
+    let prevLabel = null;
+    for (let k = 0; k <= ticks; k++) {
+      const v = t0 + (span * k) / ticks, x = margin.left + (chartW * k) / ticks;
+      const label = dated
+        ? new Date(v).toLocaleDateString("es-MX", span > 200 * DAY ? { month: "short", year: "2-digit", timeZone: "UTC" } : { day: "numeric", month: "short", timeZone: "UTC" })
+        : (k === ticks ? "hoy" : "");
+      ctx.textAlign = k === 0 ? "left" : k === ticks ? "right" : "center";   // que la primera y la última no se corten
+      if (label !== prevLabel) ctx.fillText(label, x, h - 14);
+      prevLabel = label;
+    }
+
+    // Ofertas abiertas (barras al fondo)
+    const maxO = Math.max(0, ...data.map((x) => x.offers || 0));
+    if (maxO) {
+      const bw = Math.max(1, Math.min(10, (chartW / data.length) * 0.6));
+      ctx.fillStyle = "rgba(100,116,139,0.28)";
+      data.forEach((d) => {
+        if (!d.offers) return;
+        const bh = (d.offers / maxO) * chartH * 0.3;
+        ctx.fillRect(getX(d) - bw / 2, margin.top + chartH - bh, bw, bh);
+      });
+    }
+
+    // Precio justo (referencia)
+    if (current.fair && current.fair >= minP && current.fair <= maxP) {
+      const y = getY(current.fair);
+      ctx.save();
+      ctx.setLineDash([4, 4]); ctx.strokeStyle = "rgba(148,163,184,0.7)";
+      ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(w - margin.right, y); ctx.stroke();
+      ctx.restore();
+    }
+
+    // Área y línea del precio medio
+    // Tramos: dos ventas separadas por más de 14 días sin ventas no se unen (antes una línea recta "subía"
+    // de 180 a 780 a lo largo de un año en que no se vendió nada). Un tramo de un solo día queda como punto.
+    const pts = data.map((d) => [getX(d), getY(d.avg)]);
+    const GAP = 14 * DAY, segs = [[0]];
+    for (let i = 1; i < data.length; i++) {
+      if (dated && data[i].t - data[i - 1].t > GAP) segs.push([]);
+      segs.at(-1).push(i);
+    }
+    const grad = ctx.createLinearGradient(0, margin.top, 0, margin.top + chartH);
+    grad.addColorStop(0, "rgba(245, 184, 61, 0.22)"); grad.addColorStop(1, "rgba(245, 184, 61, 0)");
+    ctx.strokeStyle = "#f5b83d"; ctx.lineWidth = 2; ctx.lineJoin = "round";
+    segs.forEach((seg) => {
+      const sp = seg.map((i) => pts[i]);
+      if (sp.length === 1) {
+        ctx.fillStyle = "#f5b83d";
+        ctx.beginPath(); ctx.arc(sp[0][0], sp[0][1], 3, 0, Math.PI * 2); ctx.fill();
+        return;
+      }
+      ctx.beginPath();
+      sp.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.lineTo(sp.at(-1)[0], margin.top + chartH);
+      ctx.lineTo(sp[0][0], margin.top + chartH);
+      ctx.fillStyle = grad; ctx.fill();
+      ctx.beginPath();
+      sp.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.stroke();
+    });
+
+    // Pronóstico: abanico desde el último precio hasta el rango a 14 días
+    if (fq) {
+      const [lx0, ly0] = pts[pts.length - 1], fx = getX({ t: fcT });
+      const fan = (lo, hi, color) => {
+        ctx.beginPath(); ctx.moveTo(lx0, ly0); ctx.lineTo(fx, getY(hi)); ctx.lineTo(fx, getY(lo)); ctx.closePath();
+        ctx.fillStyle = color; ctx.fill();
+      };
+      fan(fq[0], fq[4], "rgba(245, 184, 61, 0.10)");
+      fan(fq[1], fq[3], "rgba(245, 184, 61, 0.18)");
+      ctx.save();
+      ctx.setLineDash([5, 4]); ctx.strokeStyle = "#f5b83d"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(lx0, ly0); ctx.lineTo(fx, getY(fq[2])); ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = "#f5b83d";
+      ctx.beginPath(); ctx.arc(fx, getY(fq[2]), 3, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Precio más bajo visto ese día
+    ctx.fillStyle = "#34d399";
+    data.forEach((d) => {
+      if (d.low) { ctx.beginPath(); ctx.arc(getX(d), getY(d.low), 2.5, 0, Math.PI * 2); ctx.fill(); }
+    });
+
+    // Leyenda
+    ctx.textAlign = "left"; ctx.font = "12px 'Fira Sans', sans-serif";
+    let lx = margin.left;
+    const legend = (color, text) => { ctx.fillStyle = color; ctx.fillText(text, lx, 12); lx += ctx.measureText(text).width + 14; };
+    const narrow = w < 520;   // en celular, etiquetas cortas para que quepan
+    legend("#f5b83d", narrow ? "● Medio" : "● Precio medio");
+    if (data.some((x) => x.low)) legend("#34d399", narrow ? "● Baja" : "● Más baja");
+    if (current.fair) legend("#94a3b8", narrow ? "┄ Justo" : "┄ Precio justo");
+    if (maxO) legend("#64748b", "▮ Ofertas");
+    if (fq) legend("rgba(245,184,61,0.8)", narrow ? "◢ 14 d" : "◢ Pronóstico 14 d");
+
+    chartState = { data, pts, margin, chartH, w, h, getY };
+    if (hoverIdx != null && hoverIdx < data.length) drawHover(ctx, hoverIdx);
+  }
+
+  function drawHover(ctx, i) {
+    const { data, pts, margin, chartH, w } = chartState;
+    const d = data[i], [x, y] = pts[i];
+    ctx.save();
+    ctx.strokeStyle = "rgba(232,236,243,0.3)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, margin.top); ctx.lineTo(x, margin.top + chartH); ctx.stroke();
+    ctx.fillStyle = "#f5b83d"; ctx.strokeStyle = "#070b14"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (d.low) {
+      ctx.fillStyle = "#34d399";
+      ctx.beginPath(); ctx.arc(x, chartState.getY(d.low), 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+
+    const tip = $("chart-tip");
+    const rows = [`<b>${d.t != null ? fmtDate(d.t) : `hace ${data.length - 1 - i} días con ventas`}</b>`,
+      `<span style="color:var(--accent)">Precio medio</span> <span class="num">${fmt(d.avg)}</span>`];
+    if (d.low) rows.push(`<span style="color:var(--green)">Más baja</span> <span class="num">${fmt(d.low)}</span>`);
+    if (d.sold != null) rows.push(`Vendidos ${fmt(d.sold)}`);
+    if (d.offers != null) rows.push(`Ofertas ${fmt(d.offers)}`);
+    if (current.fair) rows.push(`<span style="color:var(--muted)">vs justo ${pct((d.avg - current.fair) / current.fair)}</span>`);
+    tip.innerHTML = rows.join("<br>");
+    tip.hidden = false;
+    const tw = tip.offsetWidth;
+    tip.style.left = `${x + 12 + tw > w ? x - 12 - tw : x + 12}px`;
+    tip.style.top = `${margin.top}px`;
+  }
+
+  function chartHover(ev) {
+    if (!chartState) return;
+    const rect = $("chart").getBoundingClientRect();
+    const mx = ev.clientX - rect.left;
+    let best = 0;
+    chartState.pts.forEach(([x], i) => { if (Math.abs(x - mx) < Math.abs(chartState.pts[best][0] - mx)) best = i; });
+    if (best === hoverIdx) return;
+    hoverIdx = best;
+    drawChart();
+  }
+  $("chart").addEventListener("pointermove", chartHover);
+  $("chart").addEventListener("pointerdown", chartHover);
+  $("chart").addEventListener("pointerleave", () => { hoverIdx = null; drawChart(); });
+  new ResizeObserver(() => { if (current) drawChart(); }).observe($("chart"));
+
+  let lastFocus = null, openedInPage = false;
+  async function route() {
+    const k = location.hash.slice(1);
+    if (!k || k === "dashboard-root" || k === "hero") {
+      const wasOpen = $("overlay").classList.contains("active");
+      $("overlay").classList.remove("active");
+      $("overlay").inert = true;
+      document.body.style.overflow = "";
+      current = null;
+      currentHistory = null;
+      if (wasOpen && lastFocus && document.contains(lastFocus)) lastFocus.focus({ preventScroll: true });
+      return;
+    }
+    const s = all.find((x) => x.key === k);
+    if (!s) return;
+    current = s;
+    $("detail-name").textContent = s.name;
+    $("detail-key").textContent = s.key;
+    const icon = $("detail-icon"), iconSrc = getIcon(s);
+    icon.style.visibility = iconSrc ? "" : "hidden";
+    icon.dataset.alt = getIconAlt(s);
+    if (iconSrc) { icon.referrerPolicy = "no-referrer"; icon.src = iconSrc; } else icon.removeAttribute("src");
+    $("detail-price").textContent = s.price ? fmt(s.price) : "Sin ofertas";
+    $("detail-fair").innerHTML = fairHtml(s);
+    const fairNote = s.fairIssue || (!s.fair ? "No hay suficientes ventas para calcularlo." : "");
+    $("detail-fair-note").textContent = fairNote;
+    $("detail-fair-note").hidden = !fairNote;
+    
+    // Extra Decision Info
+    const extra = $("detail-extra");
+    let html = `<div class="stats-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 24px;">`;
+    if (s.price && s.fair) {
+      const fee = index.fee_pct || 1;
+      const net = Math.round(s.fair * (1 - fee/100) - s.price) || 0;   // || 0: sin "-0"
+      const roi = Math.round((net / s.price) * 100);
+      html += s.fairOk
+        ? `<div class="stat-card"><span class="label">Ganancia si revendes al justo (con comisión)</span><span class="value ${net > 0 ? 'up' : 'down'}">${net > 0 ? '+' : ''}${fmt(net)} (${roi}%)</span></div>`
+        : `<div class="stat-card"><span class="label">Ganancia si revendes al justo</span><span class="value" style="color:var(--muted);font-size:18px">No confiable</span>
+           <span class="trend">${esc(s.fairIssue)}</span></div>`;
+    }
+    if (s.fair) {
+      html += `<div class="stat-card" id="sell-odds"><span class="label">Si lo publicas al precio justo (${fmt(s.fair)})</span><span class="value">…</span>
+        <span class="trend">Midiendo con su historial</span></div>`;
+    }
+    html += `</div>`;
+    
+    if (s.offers != null && s.perDay) {
+      html += `<div class="info-row" style="margin-bottom:12px"><span>Ofertas en venta: <b class="num">${fmt(s.offers)}</b></span>
+        <span style="color:var(--muted)">se venden ~${fmt(Math.round(s.perDay))} al día</span></div>`;
+    }
+    if (s.us) {
+      const [d, p] = s.us, age = daysAgo(d);
+      html += `<div class="info-row" style="margin-bottom:12px"><span>Última venta: <b class="num">${fmt(p)}</b> (promedio de ese día)</span>
+        <span style="color:var(--muted)">${age <= 0 ? "hoy" : age === 1 ? "ayer" : `hace ${age} días`}</span></div>`;
+    }
+    if (s.l && s.h) {
+      html += `<div class="info-row">
+        <span>Rango normal: <b class="num">${fmt(s.l)}</b> – <b class="num">${fmt(s.h)}</b></span>
+        <span style="color:var(--muted)">Ventas: <b class="num" style="color:var(--text)">${fmt(s.sold)}</b>/mes</span>
+      </div>`;
+    }
+    extra.innerHTML = html;
+
+    document.body.style.overflow = "hidden";
+    if (!$("overlay").classList.contains("active")) {
+      lastFocus = document.activeElement;
+      $("overlay").inert = false;
+      $("overlay").classList.add("active");
+      $("back").focus({ preventScroll: true });
+    }
+    currentHistory = null;   // si no, se veía el historial del furni anterior mientras carga el nuevo
+    hoverIdx = null;
+    drawChart();
+    $("forecast-box").hidden = true;
+    loadForecast().then(() => { if (current === s) { renderForecast(s); drawChart(); } });
+
+    // Historial largo
+    try {
+      const r = await fetch(`h/${s.t}/${fileName(s.c)}.json`);
+      const hist = r.ok ? await r.json() : { d: {} };
+      if (current === s) { currentHistory = hist; drawChart(); histCache.set(s.key, Promise.resolve(hist)); renderSellOdds(s, hist); }
+    } catch (e) {
+      if (current === s) { currentHistory = { d: {} }; drawChart(); }
+    }
+    if (current !== s) return;
+    
+    const radar = $("radar-box");
+    radar.hidden = true;
+    await loadPrediction();
+    const pk = radarPick(s.key);
+    if (pk) {
+      radar.querySelector("strong").textContent = `Subida estimada: ${pct1(pk.expected)} en ${prediction.horizon_days} días`;
+      radar.querySelector("ul").innerHTML = pk.why.map((w) => `<li>${esc(w)}</li>`).join("");
+      radar.hidden = false;
+    }
+  }
+  window.addEventListener("hashchange", () => { openedInPage = !!location.hash.slice(1); route(); });
+
+  // ---- Índice del mercado (prediccion.json → market) ----
+  function renderMarketIndex() {
+    const m = prediction && prediction.market;
+    const box = $("market-index");
+    if (!m || !m.values || m.values.length < 2) { box.hidden = true; return; }
+    box.hidden = false;
+    const chip = (label, v) => `<span class="chip ${v > 0.002 ? "up" : v < -0.002 ? "down" : ""}">${label} <b>${pct1(v)}</b></span>`;
+    $("index-chips").innerHTML = chip("7 días", m.change7) + chip("30 días", m.change30) + chip("90 días", m.change90) +
+      (m.breadth != null ? `<span class="chip" title="Furnis arriba de su mediana del último mes">Subiendo <b>${Math.round(m.breadth * 100)}%</b></span>` : "");
+    drawMarketIndex();
+  }
+
+  function drawMarketIndex() {
+    const m = prediction && prediction.market, el = $("index-chart");
+    if (!m || !m.values || el.offsetParent === null) return;
+    const W = Math.max(280, el.clientWidth - 24), H = el.clientHeight - 12;
+    const v = m.values, n = v.length, t0 = Date.parse(m.from + "T00:00:00Z");
+    const pad = { l: 36, r: 8, t: 8, b: 20 };
+    const lo = Math.min(...v), hi = Math.max(...v), span = (hi - lo) || 1;
+    const x = (i) => pad.l + (i / (n - 1)) * (W - pad.l - pad.r);
+    const y = (val) => pad.t + (1 - (val - lo) / span) * (H - pad.t - pad.b);
+    const path = v.map((val, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(val).toFixed(1)}`).join("");
+    const area = `${path}L${x(n - 1).toFixed(1)},${H - pad.b}L${x(0).toFixed(1)},${H - pad.b}Z`;
+    const ticks = [lo, (lo + hi) / 2, hi].map((val) =>
+      `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y(val)}" y2="${y(val)}" stroke="#1a2436"/>
+       <text x="${pad.l - 6}" y="${y(val) + 3}" text-anchor="end" fill="#94a3b8" font-size="10" font-family="Fira Code, monospace">${Math.round(val)}</text>`).join("");
+    const dates = [0, Math.floor((n - 1) / 2), n - 1].map((i, k) =>
+      `<text x="${x(i)}" y="${H - 4}" text-anchor="${["start", "middle", "end"][k]}" fill="#94a3b8" font-size="10" font-family="Fira Code, monospace">${
+        new Date(t0 + i * DAY).toLocaleDateString("es-MX", { month: "short", year: "2-digit", timeZone: "UTC" })}</text>`).join("");
+    const base = 100 >= lo && 100 <= hi ? `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y(100)}" y2="${y(100)}" stroke="#94a3b8" stroke-dasharray="3 4" opacity=".6"/>` : "";
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Índice del mercado: ${pct1(m.change90)} en 90 días">
+      <defs><linearGradient id="ix-g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#f5b83d" stop-opacity=".22"/><stop offset="1" stop-color="#f5b83d" stop-opacity="0"/></linearGradient></defs>
+      ${ticks}${base}<path d="${area}" fill="url(#ix-g)"/><path d="${path}" fill="none" stroke="#f5b83d" stroke-width="1.8" stroke-linejoin="round"/>
+      ${dates}<line id="ix-cross" y1="${pad.t}" y2="${H - pad.b}" stroke="rgba(232,236,243,.3)" visibility="hidden"/>
+      <circle id="ix-dot" r="4" fill="#f5b83d" stroke="#070b14" stroke-width="2" visibility="hidden"/></svg>
+      <div id="ix-tip" class="chart-tip" hidden></div>`;
+    const svg = el.querySelector("svg"), cross = el.querySelector("#ix-cross"), dot = el.querySelector("#ix-dot"), tip = el.querySelector("#ix-tip");
+    const move = (ev) => {
+      const r = svg.getBoundingClientRect();
+      const px = (ev.clientX - r.left) * (W / r.width);
+      const i = Math.max(0, Math.min(n - 1, Math.round((px - pad.l) / (W - pad.l - pad.r) * (n - 1))));
+      cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("visibility", "visible");
+      dot.setAttribute("cx", x(i)); dot.setAttribute("cy", y(v[i])); dot.setAttribute("visibility", "visible");
+      tip.innerHTML = `<b>${fmtDate(t0 + i * DAY)}</b><br>Índice <span class="num">${v[i].toFixed(1)}</span>` +
+        (i >= 30 ? `<br><span style="color:var(--muted)">30 días: ${pct1(v[i] / v[i - 30] - 1)}</span>` : "");
+      tip.hidden = false;
+      const left = x(i) * (r.width / W) + 12;
+      tip.style.left = `${left + tip.offsetWidth > r.width ? left - 24 - tip.offsetWidth : left}px`;
+      tip.style.top = "8px";
+    };
+    svg.addEventListener("pointermove", move);
+    svg.addEventListener("pointerdown", move);
+    svg.addEventListener("pointerleave", () => { tip.hidden = true; cross.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); });
+  }
+  new ResizeObserver(() => drawMarketIndex()).observe($("index-chart"));
+
+  // ---- Tarjetas de estado (todo sale de los datos, nada fijo) ----
+  const STALE_INDEX = 14 * 3600000;   // el recolector corre cada 12 h
+  let liveError = null;
+  function setTrend(id, text, tone) {
+    const el = $(id);
+    el.textContent = text;
+    el.className = `trend${tone ? " " + tone : ""}`;
+  }
+  function renderStats() {
+    if (!index) return;
+    const selling = all.filter((s) => s.sold > 0).length;
+    setTrend("stat-active", `${fmt(selling)} con ventas en 30 días`);
+
+    const age = Date.now() - new Date(index.updated);
+    $("stat-updated-value").textContent = ago(index.updated);
+    setTrend("stat-updated", age > STALE_INDEX ? "Atrasado: se actualiza cada 12 h" : "Al día (se actualiza cada 12 h)", age > STALE_INDEX ? "down" : "up");
+    $("meta").textContent = `Actualizado ${ago(index.updated)}`;
+
+    if (prediction) {
+      const n = (prediction.picks || []).filter((p) => p.expected > 0.02).length;
+      setTrend("stat-radar", n ? `${n} en el radar` : "Radar sin recomendaciones", n ? "up" : "");
+    }
+
+    if (!index.live) {
+      $("stat-live").textContent = "Apagado";
+      setTrend("stat-live-detail", "Este hotel no tiene servidor en vivo");
+    } else if (live && live.t) {
+      const lag = Math.max(0, Math.round(Date.now() / 1000 - live.t));
+      const stale = lag > 120 || liveError;
+      $("stat-live").textContent = stale ? "Atrasado" : "En vivo";
+      const parts = [`${fmt(Object.keys(live.items || {}).length)} precios`, `hace ${lag < 60 ? lag + " s" : Math.round(lag / 60) + " min"}`];
+      if (live.top_cycle_s) parts.push(`${live.top ? "top " + fmt(live.top) : "más vendidos"} cada ${Math.round(live.top_cycle_s)} s`);
+      setTrend("stat-live-detail", liveError ? `Sin conexión (${liveError}); último dato ${parts[1]}` : parts.join(" · "), stale ? "down" : "up");
+    } else if (liveError) {
+      $("stat-live").textContent = "Sin conexión";
+      setTrend("stat-live-detail", liveError, "down");
+    } else {
+      $("stat-live").textContent = "…";
+      setTrend("stat-live-detail", "Conectando");
+    }
+  }
+  setInterval(renderStats, 5000);
+
+  // ---- App Logic ----
+  function showView(name) {
+    view = name;
+    document.querySelectorAll(".nav-item").forEach(b => {
+      b.classList.toggle("active", b.dataset.view === name);
+      if (b.dataset.view === name) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+    });
+    document.querySelectorAll(".view-content").forEach(v => {
+      v.classList.toggle("active", v.id === name + "-view");
+    });
+    if (name === "radar") renderRadar();
+    if (name === "live") renderLiveTab();
+    if (name === "launches") renderLaunches();
+    if (name === "deals") { fillDealForm(); renderDeals(); }
+  }
+  
+  document.querySelector(".nav-group").addEventListener("click", (ev) => {
+    const b = ev.target.closest(".nav-item");
+    if (b) showView(b.dataset.view);
+  });
+
+  let searchTimer;
+  $("q").addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { shown = PAGE; renderList(); }, 150);
+  });
+  $("sort").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    sortMode = b.dataset.sort;
+    $("sort").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+    renderList();
+  });
+
+  $("range").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    rangeDays = Number(b.dataset.days);
+    hoverIdx = null;
+    $("range").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+    drawChart();
+  });
+
+  // si el detalle se abrió desde la página, "atrás" lo cierra; si llegaron con el enlace directo, se limpia el hash
+  function closeDetail() {
+    if (openedInPage) history.back();
+    else location.hash = "dashboard-root";
+  }
+  $("back").addEventListener("click", closeDetail);
+  $("overlay").addEventListener("click", (e) => { if (e.target === $("overlay")) closeDetail(); });
+
+  // Teclado: Enter abre filas y tarjetas, Esc cierra el detalle, "/" va al buscador
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && current) { e.preventDefault(); closeDetail(); return; }
+    if (e.key === "/" && !e.target.closest("input, select, textarea") && !current) {
+      e.preventDefault(); showView("market"); $("q").focus(); return;
+    }
+    if ((e.key === "Enter" || e.key === " ") && e.target.matches("tr[tabindex], .radar-card[tabindex]")) {
+      e.preventDefault(); e.target.click();
+    }
+  });
+
+  $("budget-days").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    budgetDays = Number(b.dataset.days);
+    $("budget-days").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  });
+
+  // ---- Initial Fetch ----
+  console.log("Cargando HabboMarket UI...");
+  fetch(`indice.json?t=${Date.now()}`)
+    .then(r => r.json())
+    .then(json => {
+      index = json;
+      console.log("Índice cargado:", index.hotel, "Items:", Object.keys(index.items || {}).length, "Actualizado:", index.updated);
+      all = Object.entries(index.items || {}).map(([k, e]) => enrich(k, e));
+      byKey = new Map(all.map((x) => [x.key, x]));
+      
+      $("hero-count").textContent = fmt(all.length);
+      $("hotel-name").textContent = index.hotel;
+      $("hotel-sub").textContent = index.hotel;
+      document.title = `Mercado de ${index.hotel} — HabboTracker`;
+      $("market-title").textContent = `Analizando el mercado de ${index.hotel.toUpperCase()}, ${fmt(all.length)} furnis rastreados`;
+      
+      renderStats();
+      loadPrediction().then(() => { renderStats(); renderMarketIndex(); });
+      
+      // Hotel switch
+      const switchEl = $("hotel-switch");
+      Object.entries(index.hotels || {}).forEach(([id, cfg]) => {
+        const opt = document.createElement("option");
+        opt.value = id; opt.textContent = cfg.name;
+        opt.selected = id === index.hotel;
+        switchEl.appendChild(opt);
+      });
+      switchEl.addEventListener("change", (e) => {
+        const url = index.hotels[e.target.value].url;
+        location.href = url;
+      });
+
+      renderList();
+      route();
+
+      if (index.live) {
+        console.log("Iniciando seguimiento en vivo:", index.live);
+        const loadLive = async () => {
+          try {
+            // no-cache: el navegador revalida con ETag y, si vivo.json no cambió, no lo vuelve a bajar
+            const r = await fetch(index.live, { cache: "no-cache" });
+            if (!r.ok) {
+                console.error("Fallo al cargar datos en vivo:", r.status, r.statusText);
+                showLiveProblem(`el servidor respondió ${r.status}`);
+                return;
+            }
+            const data = await r.json();
+            liveError = null;
+            if (live && data.t === live.t) { renderStats(); return; }   // mismo archivo: nada que redibujar
+            live = data;
+            renderStats();
+            all.forEach(applyLiveTo);
+            const ind = $("live-indicator");
+            ind.classList.remove("offline");
+            ind.querySelector("span:last-child").textContent = "EN VIVO";
+            ind.hidden = false;
+            if (view === "market") renderList();
+            if (view === "live") renderLiveTab();
+            if (view === "deals") renderDeals();
+            if (current) {
+                // Si el furni actual tiene precio en vivo, actualizar vista
+                $("detail-price").textContent = current.price ? fmt(current.price) : "Sin ofertas";
+                if (forecast) renderForecast(current);   // la probabilidad de ganar cambia con el precio en vivo
+                const pill = $("detail-price").parentElement.querySelector(".delta-pill");
+                if (pill) {   // antes fallaba aquí si el detalle no tenía esta etiqueta, y apagaba el "EN VIVO"
+                  const delta = current.delta;
+                  pill.className = `delta-pill ${!delta ? "flat" : delta < -0.05 ? "down" : delta > 0.05 ? "up" : "flat"}`;
+                  pill.textContent = delta != null ? pct(delta) : "sin oferta";
+                }
+            }
+          } catch (e) {
+            console.error("Error en conexión en vivo (¿CORS, certificado o servidor caído?):", e);
+            showLiveProblem("no se pudo conectar con el servidor");
+            if (view === "live" && !live) {
+              $("live-rows").innerHTML = `<tr><td colspan="4" class="empty">El servidor en vivo no responde. La página sigue con los datos publicados por GitHub.</td></tr>`;
+            }
+          }
+        };
+        function showLiveProblem(reason) {
+          liveError = reason;
+          renderStats();
+          const ind = $("live-indicator");
+          ind.classList.add("offline");
+          ind.querySelector("span:last-child").textContent = "SIN EN VIVO";
+          ind.title = `Precios en vivo no disponibles: ${reason}`;
+          ind.hidden = false;
+          if (view === "live" && !live) {
+            $("live-rows").innerHTML = `<tr><td colspan="4" class="empty">Precios en vivo no disponibles (${esc(reason)}). La página sigue con los datos publicados por GitHub.</td></tr>`;
+          }
+        }
+        // cada 15 s y solo con la pestaña visible; al volver a ella se pone al día
+        let lastLive = 0;
+        const tickLive = () => {
+          if (document.hidden || Date.now() - lastLive < LIVE_EVERY - 1000) return;
+          lastLive = Date.now();
+          loadLive();
+        };
+        tickLive();
+        setInterval(tickLive, LIVE_EVERY);
+        document.addEventListener("visibilitychange", tickLive);
+      } else {
+        console.warn("No se configuró URL de datos en vivo para este hotel.");
+      }
+    })
+    .catch(err => {
+        console.error("Error crítico cargando la aplicación:", err);
+        $("market-title").innerHTML = `<span style="color:var(--red)">Error al cargar datos. Reintente en unos minutos.</span>`;
+    });
+
+  // Budget logic simplified for this example
+  $("budget-go").addEventListener("click", async () => {
+    const fee = Number(index.fee_pct ?? 1);
+    const budget = parseInt($("budget").value, 10);
+    if (!budget || budget < 1) return;
+    const btn = $("budget-go");
+    btn.disabled = true; btn.textContent = "Midiendo tiempos de venta…";
+
+    const cands = all.map((s) => {
+      const net = s.price && s.fair ? Math.round(s.fair * (1 - fee / 100) - s.price) : 0;
+      return { ...s, net, roi: s.price ? net / s.price : 0 };
+    }).filter((s) => !(s.f && daysAgo(s.f) < 14) && s.fairOk)
+      .filter((s) => s.hasFair && s.price && s.price <= budget && s.perDay >= 1 && s.net >= 2 && s.roi >= 0.03)
+      .sort((a, b) => b.roi - a.roi || b.perDay - a.perDay)
+      .slice(0, 60);
+    await loadPrediction();
+    const hists = await Promise.all(cands.map(loadHist));
+    btn.disabled = false; btn.textContent = "Calcular inversión";
+
+    // solo entra si, al precio justo, es más probable que sí se venda en el plazo elegido que que no
+    const picks = []; let left = budget;
+    cands.forEach((c, i) => {
+      if (picks.length >= 10 || c.price > left) return;
+      const o = sellOdds(hists[i], c.fair);
+      if (!o) return;
+      c.odds = o; c.p = probWithin(o, budgetDays);
+      if (c.p >= 0.5) { picks.push(c); left -= c.price; }
+    });
+
+    if (!picks.length) {
+      $("budget-out").innerHTML = `<div class="empty"><strong>Nada convence por ahora</strong>Ningún furni que quepa en tu presupuesto está por debajo de su precio justo y tiene al menos 50% de probabilidad de venderse al justo en ${budgetDays} días.</div>`;
+      return;
+    }
+    
+    const spent = budget - left, profit = picks.reduce((a, p) => a + p.net, 0);
+    $("budget-out").innerHTML = `
+      <div class="stats-grid" style="margin-top:24px">
+        <div class="stat-card">
+          <span class="label">Inversión total</span>
+          <span class="value">${fmt(spent)}</span>
+        </div>
+        <div class="stat-card">
+          <span class="label">Ganancia si todo se vende al justo</span>
+          <span class="value" style="color:var(--green)">+${fmt(profit)}</span>
+        </div>
+      </div>
+      <div class="data-section" style="margin-top:24px">
+        <div class="table-scroll"><table class="market-table">
+          <thead><tr><th scope="col">Furni</th><th scope="col" class="r">Compra</th><th scope="col" class="r col-hide-sm">Vende a</th><th scope="col" class="r">Ganancia</th><th scope="col" class="r">Venta en ≤${budgetDays} d</th><th scope="col" class="r col-hide-sm">Normalmente</th></tr></thead>
+          <tbody>
+            ${picks.map(p => `<tr data-key="${p.key}" tabindex="0">
+              <td><div class="furni-cell">
+                <div class="furni-icon"><img ${iconAttrs(p)} alt=""></div>
+                <div style="min-width:0"><span class="furni-name">${esc(p.name)}</span><span class="furni-key">${esc(p.c)}</span></div>
+              </div></td>
+              <td class="r"><span class="price-val">${fmt(p.price)}</span></td>
+              <td class="r col-hide-sm"><span class="price-val">${fmt(p.fair)}</span></td>
+              <td class="r"><span class="delta-pill down">+${fmt(p.net)} (${Math.round(p.roi * 100)}%)</span></td>
+              <td class="r num" style="color:${pctTone(p.p)}">${Math.round(p.p * 100)}%</td>
+              <td class="r num col-hide-sm">${typicalWait(p.odds)}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table></div>
+      </div>`;
+    bindRows($("budget-out"));
+  });
+
+})();
+</script>
+</body>
+</html>
