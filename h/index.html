@@ -1,0 +1,1370 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<title>Habbo Market — HabboTracker</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 5 5' shape-rendering='crispEdges'%3E%3Cpath fill='%238C5E06' d='M1 0h3v5H1zM0 1h5v3H0z'/%3E%3Cpath fill='%23D6961A' d='M1 1h3v3H1z'/%3E%3Cpath fill='%23F6D46B' d='M1 1h1v1H1z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&family=Instrument+Serif:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080a19;
+    --sidebar-bg: #0a0c1f;
+    --card-bg: rgba(255, 255, 255, 0.03);
+    --border: rgba(255, 255, 255, 0.08);
+    --text: #ffffff;
+    --muted: #a1a1a1;
+    --accent: #7c3aed; /* Monogram Purple */
+    --accent-hover: #8b5cf6;
+    --green: #10b981;
+    --red: #ef4444;
+    --font-head: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-nexora: 'Instrument Serif', serif;
+    --font-habbo: 'Instrument Serif', serif;
+    --sidebar-width: 260px;
+    --topbar-height: 70px;
+  }
+  
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+    scroll-snap-type: y mandatory;
+  }
+  
+  /* Habbo Market Hero Section */
+  .nexora-nav {
+    position: absolute;
+    top: 24px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    z-index: 100;
+    padding: 0 24px;
+  }
+  .nexora-nav-inner {
+    background: rgba(10, 10, 10, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    padding: 8px 24px;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+  }
+  .nexora-nav-logo {
+    font-family: var(--font-habbo);
+    font-size: 24px;
+    font-weight: 400;
+    font-style: italic;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .nexora-nav-links {
+    display: flex;
+    gap: 24px;
+  }
+  .nexora-nav-link {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    transition: 0.2s;
+  }
+  .nexora-nav-link:hover { color: var(--text); }
+  
+  @media (max-width: 767px) {
+    .nexora-nav-links { display: none; }
+  }
+
+  .nexora-hero {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    overflow: hidden;
+    background: #080a19;
+    scroll-snap-align: start;
+  }
+  .nexora-hero::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 20vh;
+    background: linear-gradient(to bottom, transparent, var(--bg));
+    z-index: 5;
+    pointer-events: none;
+  }
+  .nexora-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+    opacity: 0.8;
+  }
+  .nexora-overlay {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.6) 100%);
+    z-index: 2;
+  }
+  .nexora-content {
+    position: relative;
+    z-index: 10;
+    max-width: 900px;
+    padding: 0 24px;
+  }
+  .nexora-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    background: rgba(124, 58, 237, 0.1);
+    border: 1px solid rgba(124, 58, 237, 0.2);
+    border-radius: 99px;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 32px;
+    animation: fade-down 0.8s ease-out;
+  }
+  .nexora-badge.live {
+    animation: fade-down 0.8s ease-out, pulse-ring 2s infinite;
+  }
+  .nexora-title {
+    font-family: var(--font-habbo);
+    font-size: clamp(40px, 10vw, 100px);
+    line-height: 0.95;
+    margin-bottom: 24px;
+    font-style: italic;
+    font-weight: 400;
+    animation: fade-up 1s ease-out 0.2s both;
+  }
+  .nexora-title span { display: block; }
+  .nexora-desc {
+    font-size: 18px;
+    color: var(--muted);
+    max-width: 600px;
+    margin: 0 auto 40px;
+    animation: fade-up 1s ease-out 0.4s both;
+  }
+  .nexora-actions {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    animation: fade-up 1s ease-out 0.6s both;
+  }
+  .btn-nexora {
+    padding: 16px 32px;
+    border-radius: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: 0.3s;
+    cursor: pointer;
+  }
+  .btn-nexora-primary {
+    background: var(--text);
+    color: #000;
+    border: none;
+  }
+  .btn-nexora-primary:hover { transform: scale(1.05); }
+  .btn-nexora-outline {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: var(--text);
+  }
+  .btn-nexora-outline:hover { background: rgba(255,255,255,0.05); }
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fade-down {
+    from { opacity: 0; transform: translateY(-30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  #dashboard-root {
+    display: flex;
+    width: 100%;
+    background: var(--bg);
+    scroll-snap-align: start;
+    position: relative;
+    min-height: 100vh;
+  }
+
+  /* Sidebar Adjustment */
+  .sidebar {
+    width: var(--sidebar-width);
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    z-index: 50;
+    overflow-y: auto;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--font-head);
+    font-weight: 700;
+    font-size: 20px;
+    margin-bottom: 40px;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .logo-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+  }
+  
+  .nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 10px;
+    color: var(--muted);
+    text-decoration: none;
+    transition: all 0.2s;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+    font-size: inherit;
+  }
+  .nav-item svg { width: 20px; height: 20px; }
+  .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+  .nav-item.active { color: var(--text); background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.2); }
+  .nav-item.active svg { color: var(--accent); }
+  
+  .sidebar-footer {
+    margin-top: auto;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  
+  /* Main Content */
+  .main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+  
+  /* Top Bar */
+  .top-bar {
+    height: var(--topbar-height);
+    padding: 0 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .search-wrapper {
+    position: relative;
+    width: 400px;
+  }
+  .search-wrapper input {
+    width: 100%;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 16px 10px 40px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-wrapper input:focus { border-color: var(--accent); }
+  .search-wrapper svg {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    width: 18px;
+    height: 18px;
+  }
+  
+  .top-actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--green);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .status-pill.offline {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--red);
+  }
+  .pulse {
+    width: 8px;
+    height: 8px;
+    background: currentColor;
+    border-radius: 50%;
+    animation: pulse-ring 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+  }
+  @keyframes pulse-ring { 0% { transform: scale(0.33); opacity: 1; } 80%, 100% { opacity: 0; } }
+  
+  .hotel-select {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  /* Dashboard Content */
+  .content-scroll {
+    flex: 1;
+    padding: 40px;
+  }
+  
+  .view-header {
+    margin-bottom: 32px;
+  }
+  .view-header h1 {
+    font-family: var(--font-head);
+    font-size: 32px;
+    margin: 0 0 8px;
+  }
+  .view-header p {
+    color: var(--muted);
+    margin: 0;
+  }
+  
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 24px;
+    margin-bottom: 40px;
+  }
+  .stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px;
+  }
+  .stat-card .label { color: var(--muted); font-size: 13px; font-weight: 500; margin-bottom: 12px; display: block; }
+  .stat-card .value { font-family: var(--font-head); font-size: 28px; font-weight: 700; margin-bottom: 8px; display: block; }
+  .stat-card .trend { font-size: 12px; display: flex; align-items: center; gap: 4px; }
+  .trend.up { color: var(--green); }
+  .trend.down { color: var(--red); }
+  
+  .data-section {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .section-header h2 { font-family: var(--font-head); font-size: 20px; margin: 0; }
+  
+  .controls { display: flex; gap: 12px; }
+  .btn-filter {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .btn-filter:hover { background: rgba(255,255,255,0.1); }
+  .btn-filter[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+  
+  /* Table Styles */
+  .market-table { width: 100%; border-collapse: collapse; text-align: left; }
+  .market-table th { padding: 16px 24px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .market-table td { padding: 16px 24px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .market-table tr:last-child td { border-bottom: none; }
+  .market-table tr:hover { background: rgba(255,255,255,0.02); cursor: pointer; }
+  
+  .furni-cell { display: flex; align-items: center; gap: 12px; }
+  .furni-icon { width: 40px; height: 40px; background: rgba(255,255,255,0.05); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .furni-name { font-weight: 600; display: block; }
+  .furni-key { color: var(--muted); font-size: 11px; }
+  
+  .price-val { font-family: var(--font-head); font-weight: 700; font-size: 16px; }
+  .delta-pill { display: inline-flex; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+  .delta-pill.down { background: rgba(16, 185, 129, 0.1); color: var(--green); }
+  .delta-pill.up { background: rgba(239, 68, 68, 0.1); color: var(--red); }
+  .delta-pill.flat { background: rgba(255, 255, 255, 0.05); color: var(--muted); }
+
+  /* Detail Overlay */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    pointer-events: none;
+    transition: background 0.3s;
+  }
+  .overlay.active { background: rgba(0,0,0,0.6); pointer-events: auto; }
+  .detail-panel {
+    width: 600px;
+    height: 100%;
+    background: var(--sidebar-bg);
+    border-left: 1px solid var(--border);
+    transform: translateX(100%);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    padding: 40px;
+    overflow-y: auto;
+  }
+  .overlay.active .detail-panel { transform: translateX(0); }
+  
+  .detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
+  .close-btn { background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 8px; border-radius: 50%; transition: 0.2s; }
+  .close-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+  
+  .chart-container {
+    width: 100%;
+    height: 250px;
+    margin-bottom: 32px;
+    position: relative;
+  }
+  canvas { width: 100% !important; height: 100% !important; }
+  
+  /* Budget & Radar Views */
+  .view-content { display: none; }
+  .view-content.active { display: block; }
+  
+  .radar-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+  .radar-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
+  
+  .budget-form { background: var(--card-bg); border: 1px solid var(--border); border-radius: 20px; padding: 32px; margin-bottom: 32px; }
+  .form-group { margin-bottom: 24px; }
+  .form-label { display: block; margin-bottom: 8px; color: var(--muted); font-weight: 500; }
+  .form-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; color: var(--text); font-family: inherit; }
+  .btn-submit { background: var(--accent); color: white; border: none; padding: 14px 28px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+  .btn-submit:hover { background: var(--accent-hover); }
+
+  /* Mobile */
+  @media (max-width: 1024px) {
+    .sidebar { width: 80px; padding: 24px 12px; }
+    .logo span, .nav-item span { display: none; }
+    .logo { justify-content: center; }
+    .nav-item { justify-content: center; }
+    .detail-panel { width: 100%; }
+  }
+
+  /* Utility */
+  .empty { padding: 60px; text-align: center; color: var(--muted); }
+  .hidden { display: none !important; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- Habbo Market Hero -->
+<section class="nexora-hero" id="hero">
+  <div class="nexora-nav">
+    <div class="nexora-nav-inner">
+      <a href="#" class="nexora-nav-logo">Habbo Market</a>
+      <div class="nexora-nav-links">
+        <a href="#dashboard-root" class="nexora-nav-link">Mercado</a>
+        <a href="#radar-view" class="nexora-nav-link">Radar</a>
+        <a href="#live-view" class="nexora-nav-link">En Vivo</a>
+      </div>
+      <button onclick="document.getElementById('dashboard-root').scrollIntoView({behavior:'smooth'})" class="btn-nexora btn-nexora-primary" style="padding: 8px 16px; border-radius: 8px; font-size: 13px;">Entrar</button>
+    </div>
+  </div>
+  <video class="nexora-video" autoplay loop muted playsinline>
+    <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260813_092641_de52eb87-daf2-41db-92cb-7a56eae012a5.mp4" type="video/mp4">
+  </video>
+  <div class="nexora-overlay"></div>
+  
+  <div class="nexora-content">
+    <div class="nexora-badge">Habbo Market — En Vivo</div>
+    <h1 class="nexora-title">
+      <span>Seguimiento Inteligente</span>
+      <span>Diseñado para <i>Ganar.</i></span>
+    </h1>
+    <p class="nexora-desc">
+      HabboTracker potencia a los comerciantes modernos con automatización inteligente, modelos predictivos y datos en tiempo real del mercadillo.
+    </p>
+    <div class="nexora-actions">
+      <button onclick="document.getElementById('dashboard-root').scrollIntoView({behavior:'smooth'})" class="btn-nexora btn-nexora-primary">Abrir Panel</button>
+      <a href="https://habbomarket.live" class="btn-nexora btn-nexora-outline">Ver Soluciones</a>
+    </div>
+
+    <div class="nexora-stats" style="margin-top: 60px; display: flex; gap: 40px; justify-content: center; animation: fade-up 1s ease-out 0.8s both;">
+      <div style="text-align: left;">
+        <span style="display: block; font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 1px; margin-bottom: 4px;">Hotel Activo</span>
+        <span id="hero-hotel-nexora" style="font-size: 18px; font-weight: 600;">—</span>
+      </div>
+      <div style="text-align: left;">
+        <span style="display: block; font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 1px; margin-bottom: 4px;">Furnis Rastreados</span>
+        <span id="hero-count-nexora" style="font-size: 18px; font-weight: 600;">—</span>
+      </div>
+      <div style="text-align: left;">
+        <span style="display: block; font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 1px; margin-bottom: 4px;">Última Sync</span>
+        <span id="hero-sync-nexora" style="font-size: 18px; font-weight: 600;">—</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="dashboard-root">
+<aside class="sidebar">
+  <a href="/" class="logo">
+    <div class="logo-icon">H</div>
+    <span>HabboTracker</span>
+  </a>
+  
+  <nav class="nav-group">
+    <button class="nav-item active" data-view="market">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+      <span>Mercado</span>
+    </button>
+    <button class="nav-item" data-view="radar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+      <span>Radar AI</span>
+    </button>
+    <button class="nav-item" data-view="live">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+      <span>En Vivo</span>
+    </button>
+    <button class="nav-item" data-view="launches">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+      <span>Lanzamientos</span>
+    </button>
+    <button class="nav-item" data-view="budget">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+      <span>Inversor</span>
+    </button>
+  </nav>
+  
+  <div class="sidebar-footer">
+    <select id="hotel-switch" class="hotel-select" style="width:100%"></select>
+  </div>
+</aside>
+
+<main class="main-content">
+  <header class="top-bar">
+    <div class="search-wrapper">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <input type="text" id="q" placeholder="Buscar furnis por nombre o código...">
+    </div>
+    
+    <div class="top-actions">
+      <div id="live-indicator" class="status-pill" hidden>
+        <span class="pulse"></span>
+        <span>EN VIVO</span>
+      </div>
+      <div class="status-pill" id="meta">Cargando...</div>
+    </div>
+  </header>
+  
+  <div class="content-scroll">
+    <!-- Market View -->
+    <div id="market-view" class="view-content active">
+      <div class="view-header">
+        <h1>Dashboard</h1>
+        <p id="market-title">Analizando el mercado global de Habbo</p>
+      </div>
+
+      <div id="alerts-container"></div>
+      
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="label">Total Activos</span>
+          <span class="value" id="hero-count">—</span>
+          <span class="trend up">Monitoreando</span>
+        </div>
+        <div class="stat-card">
+          <span class="label">Hotel Activo</span>
+          <span class="value" id="hotel-name">.ES</span>
+          <span class="trend">Actualizado</span>
+        </div>
+        <div class="stat-card">
+          <span class="label">Oportunidades</span>
+          <span class="value" id="opportunity-count">0</span>
+          <span class="trend down">Radar Activo</span>
+        </div>
+        <div class="stat-card">
+          <span class="label">Estado de Red</span>
+          <span class="value">Óptimo</span>
+          <span class="trend up">Sync 100%</span>
+        </div>
+      </div>
+      
+      <div class="data-section">
+        <div class="section-header">
+          <h2>Resumen del Mercado</h2>
+          <div class="controls" id="sort">
+            <button class="btn-filter" data-sort="sold" aria-pressed="true">Más Vendidos</button>
+            <button class="btn-filter" data-sort="delta">Más Baratos</button>
+            <button class="btn-filter" data-sort="price">Precio</button>
+          </div>
+        </div>
+        <table class="market-table">
+          <thead>
+            <tr>
+              <th>Furni</th>
+              <th>Precio</th>
+              <th>Justo</th>
+              <th>Trend</th>
+              <th>Mensual</th>
+            </tr>
+          </thead>
+          <tbody id="list">
+            <!-- Items injected via JS -->
+          </tbody>
+        </table>
+        <div id="more" class="empty" style="cursor:pointer; padding:20px; font-weight:600">Ver más resultados</div>
+      </div>
+    </div>
+
+    <!-- Radar View -->
+    <div id="radar-view" class="view-content">
+      <div class="view-header">
+        <h1>Radar AI</h1>
+        <p>Predicciones y análisis de tendencias algorítmicas</p>
+      </div>
+      <div id="radar" class="radar-grid"></div>
+    </div>
+
+    <!-- Live View -->
+    <div id="live-view" class="view-content">
+      <div class="view-header">
+        <h1>Transmisión en Vivo</h1>
+        <p>Datos en tiempo real directo desde el mercadillo</p>
+      </div>
+      <div id="live-list" class="data-section">
+        <table class="market-table">
+          <thead>
+            <tr>
+              <th>Furni</th>
+              <th>Precio Vivo</th>
+              <th>Ofertas</th>
+              <th>Edad</th>
+            </tr>
+          </thead>
+          <tbody id="live-rows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Launches View -->
+    <div id="launches-view" class="view-content">
+      <div class="view-header">
+        <h1>Lanzamientos</h1>
+        <p>Nuevos furnis detectados recientemente</p>
+      </div>
+      <div id="launches" class="data-section"></div>
+    </div>
+
+    <!-- Budget View -->
+    <div id="budget-view" class="view-content">
+      <div class="view-header">
+        <h1>Inversor Inteligente</h1>
+        <p>Optimiza tus créditos con el mejor ROI</p>
+      </div>
+      <div class="budget-form">
+        <div class="form-group">
+          <label class="form-label">Tu Presupuesto (Créditos)</label>
+          <input type="number" id="budget" class="form-input" placeholder="Ej: 500">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tiempo máximo de reventa</label>
+          <div class="controls" id="budget-days">
+            <button class="btn-filter" data-days="7" aria-pressed="true">7 Días</button>
+            <button class="btn-filter" data-days="15">15 Días</button>
+            <button class="btn-filter" data-days="30">30 Días</button>
+          </div>
+        </div>
+        <button id="budget-go" class="btn-submit">Calcular Inversión</button>
+      </div>
+      <div id="budget-out"></div>
+    </div>
+  </div>
+</main>
+
+<!-- Detail Overlay -->
+<div class="overlay" id="overlay">
+  <div class="detail-panel">
+    <div class="detail-header">
+      <div id="detail-meta">
+        <h2 id="detail-name" style="margin:0; font-family:var(--font-head); font-size:28px;">Furni Name</h2>
+        <span id="detail-key" style="color:var(--muted); font-family:var(--mono);">code_key</span>
+      </div>
+      <button class="close-btn" id="back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    
+    <div class="stats-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 32px;">
+      <div class="stat-card">
+        <span class="label">Precio Actual</span>
+        <span class="value" id="detail-price">—</span>
+      </div>
+      <div class="stat-card">
+        <span class="label">Precio Justo</span>
+        <span class="value" id="detail-fair">—</span>
+      </div>
+    </div>
+
+    <div class="section-header" style="padding-left:0; border-bottom:none; margin-bottom:12px;">
+      <h2>Historial de Precios</h2>
+      <div class="controls" id="range">
+        <button class="btn-filter" data-days="7" aria-pressed="true">7d</button>
+        <button class="btn-filter" data-days="30">30d</button>
+        <button class="btn-filter" data-days="90">90d</button>
+      </div>
+    </div>
+    
+    <div class="chart-container">
+      <canvas id="chart"></canvas>
+    </div>
+
+    <div id="radar-box" class="stat-card" style="background:rgba(124, 58, 237, 0.05); border-color:rgba(124, 58, 237, 0.2);" hidden>
+      <span class="label" style="color:var(--accent)">Análisis AI</span>
+      <p style="margin:12px 0; line-height:1.6;"><strong></strong></p>
+      <ul style="margin:0; padding-left:20px; color:var(--muted);"></ul>
+    </div>
+    
+    <div id="detail-extra" style="margin-top:32px;"></div>
+  </div>
+</div>
+
+</div> <!-- End dashboard-root -->
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => n?.toLocaleString();
+  const esc = (t) => { const e = document.createElement("div"); e.textContent = t; return e.innerHTML; };
+  const store = { get: (k) => localStorage.getItem(k), set: (k, v) => localStorage.setItem(k, v) };
+  
+  let index, all = [], current = null, live = null;
+  let view = "market", sortMode = "sold", shown = 50, rangeDays = 7, budgetDays = 7;
+  const PAGE = 50, LIVE_EVERY = 30000;
+
+  function ago(ts) {
+    if (!ts) return "nunca";
+    const d = new Date(ts);
+    const diff = (Date.now() - d.getTime()) / 1000;
+    if (diff < 60) return "ahora";
+    if (diff < 3600) return `hace ${Math.round(diff / 60)}m`;
+    if (diff < 86400) return `hace ${Math.round(diff / 3600)}h`;
+    return `hace ${Math.round(diff / 86400)}d`;
+  }
+  function agoShort(ts) {
+    const d = new Date(ts);
+    const diff = (Date.now() - d.getTime()) / 1000;
+    if (diff < 60) return `${Math.round(diff)}s`;
+    return `${Math.round(diff / 60)}m`;
+  }
+  function daysAgo(iso) { return Math.floor((Date.now() - new Date(iso)) / 86400000); }
+  const fileName = (c) => c.replace(/\*/g, "~").replace(/[^A-Za-z0-9_.\-~]/g, "-");
+  function pct(v) { return (v > 0 ? "+" : "") + Math.round(v * 100) + "%"; }
+  function pct1(v) { return (v > 0 ? "+" : "") + (v * 100).toFixed(1) + "%"; }
+
+  function getIcon(s) {
+    const hotel = index?.hotel || "habbo.es";
+    const domain = hotel.includes("habbo.") ? (hotel.startsWith("www.") ? hotel : "www." + hotel) : `www.habbo.${hotel}`;
+    return `https://${domain}/habbo-imaging/furni?typeid=${s.c}`;
+  }
+
+  function enrich(k, e) {
+    const s = { key: k, ...e };
+    s.name = s.n;
+    s.price = s.p;
+    s.sold = s.s || 0;
+    s.offers = s.o;
+    s.fair = s.m;
+    s.spark = s.sp || [];
+    s.launched = s.f;
+    s.perDay = s.sold / 30;
+    s.hasFair = s.fair != null;
+    if (index.live) applyLiveTo(s);
+    else {
+      s.delta = s.price && s.fair ? (s.price - s.fair) / s.fair : null;
+    }
+    return s;
+  }
+
+  function applyLiveTo(s) {
+    const v = live && live.items && live.items[s.key];
+    if (!v) return false;
+    const [p, o, age] = v;
+    s.price = p || null;
+    if (o != null) s.offers = o;
+    s.delta = s.price && s.fair ? (s.price - s.fair) / s.fair : null;
+    if (o != null && s.perDay) s.dr = Math.round(o / s.perDay * 10) / 10;
+    s.liveAt = (live.t - age) * 1000;
+    return true;
+  }
+
+  function rowHtml(s) {
+    const deltaClass = !s.delta ? "flat" : s.delta < -0.05 ? "down" : s.delta > 0.05 ? "up" : "flat";
+    const deltaText = s.delta ? pct(s.delta) : "est.";
+    return `<tr data-key="${s.key}">
+      <td>
+        <div class="furni-cell">
+          <div class="furni-icon"><img src="${getIcon(s)}" loading="lazy"></div>
+          <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div>
+        </div>
+      </td>
+      <td><div class="price-val">${s.price ? fmt(s.price) : "—"}</div></td>
+      <td><div class="price-val" style="opacity:0.6">${s.fair ? fmt(s.fair) : "—"}</div></td>
+      <td><div class="delta-pill ${deltaClass}">${deltaText}</div></td>
+      <td><div style="font-weight:600">${fmt(s.sold)}</div><div style="font-size:10px; color:var(--muted)">v/mes</div></td>
+    </tr>`;
+  }
+
+  function renderList() {
+    const q = $("q").value.toLowerCase();
+    let rows = all.filter((s) => s.name.toLowerCase().includes(q) || s.key.toLowerCase().includes(q));
+    if (sortMode === "sold") rows.sort((a, b) => b.sold - a.sold);
+    if (sortMode === "price") rows.sort((a, b) => (b.price || 0) - (a.price || 0));
+    if (sortMode === "delta") rows.sort((a, b) => (a.delta || 0) - (b.delta || 0));
+    
+    const page = rows.slice(0, shown);
+    $("list").innerHTML = page.map((s) => rowHtml(s)).join("");
+    $("more").hidden = shown >= rows.length;
+    
+    const opportunities = all.filter(s => s.delta && s.delta < -0.15).length;
+    $("opportunity-count").textContent = opportunities;
+  }
+
+  function bindRows(el) {
+    el.querySelectorAll("tr").forEach((tr) => {
+      tr.addEventListener("click", () => {
+        const s = all.find((x) => x.key === tr.dataset.key);
+        if (s) { current = s; location.hash = s.key; }
+      });
+    });
+  }
+  const observer = new MutationObserver(() => bindRows($("list")));
+  observer.observe($("list"), { childList: true });
+
+  $("more").addEventListener("click", () => { shown += PAGE; renderList(); });
+
+  // ---- Radar AI ----
+  let prediction = null;
+  async function loadPrediction() {
+    if (prediction) return;
+    try {
+      const r = await fetch("prediccion.json");
+      prediction = await r.json();
+    } catch (e) { prediction = { items: {} }; }
+  }
+
+  function radarPick(key) {
+    const p = (prediction.picks || []).find(x => x.k === key);
+    if (!p) return null;
+    return { expected: p.expected, why: p.why };
+  }
+
+  async function renderRadar() {
+    await loadPrediction();
+    const picks = (prediction.picks || []).map(p => {
+      const s = all.find(x => x.key === p.k);
+      return s ? { ...s, ...p } : null;
+    }).filter(x => x && x.expected > 0.02)
+      .sort((a, b) => b.expected - a.expected);
+    
+    if (!picks.length) {
+      $("radar").innerHTML = `<div class="empty"><strong>Buscando señales...</strong>El radar necesita más datos históricos para generar nuevas predicciones confiables.</div>`;
+      return;
+    }
+
+    $("radar").innerHTML = picks.slice(0, 12).map((s) => {
+      return `<div class="radar-card" style="cursor:pointer" onclick="location.hash='${s.key}'">
+        <div class="furni-cell" style="margin-bottom:16px">
+          <div class="furni-icon"><img src="${getIcon(s)}"></div>
+          <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c)}</span></div>
+        </div>
+        <div class="label">Crecimiento Estimado</div>
+        <div class="value" style="color:var(--green)">${pct1(s.expected)}</div>
+        <div class="trend">en ${prediction.horizon_days} días</div>
+        <div class="radar-tags" style="margin-top:12px">
+          ${(s.why || []).map(w => `<span class="tag">${esc(w)}</span>`).join("")}
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  // ---- Live View ----
+  function renderLiveTab() {
+    if (!live || !live.items) {
+       $("live-rows").innerHTML = `<tr><td colspan="4" class="empty">Esperando datos en vivo...</td></tr>`;
+       return;
+    }
+    const entries = Object.entries(live.items)
+      .map(([k, v]) => ({ key: k, price: v[0], offers: v[1], age: v[2] }))
+      .sort((a, b) => a.age - b.age);
+    
+    $("live-rows").innerHTML = entries.slice(0, 50).map((e) => {
+      const s = all.find(x => x.key === e.key) || { name: "Furni Desconocido", c: e.key.split(":")[1] };
+      return `<tr onclick="location.hash='${e.key}'">
+        <td><div class="furni-cell">
+          <div class="furni-icon"><img src="${getIcon(s)}"></div>
+          <div><span class="furni-name">${esc(s.name)}</span><span class="furni-key">${esc(s.c || e.key.split(":")[1])}</span></div>
+        </div></td>
+        <td><div class="price-val">${e.price || "—"}</div></td>
+        <td>${e.offers != null ? e.offers : "—"}</td>
+        <td>hace ${e.age}s</td>
+      </tr>`;
+    }).join("");
+  }
+
+  // ---- Launches ----
+  function renderLaunches() {
+    const rows = all.filter((s) => s.launched).sort((a, b) => b.launched.localeCompare(a.launched) || b.sold - a.sold);
+    if (!rows.length) {
+      $("launches").innerHTML = `<div class="empty"><strong>Sin lanzamientos recientes</strong></div>`;
+      return;
+    }
+    $("launches").innerHTML = `<table class="market-table"><thead><tr><th>Furni</th><th>Fecha</th><th>Ventas</th><th>Estado</th></tr></thead>
+      <tbody>${rows.map(s => {
+        const age = daysAgo(s.launched);
+        const when = age <= 0 ? "Hoy" : age === 1 ? "Ayer" : `${age}d`;
+        const peak = s.spark?.length ? Math.max(...s.spark) : null;
+        let state = '<span class="delta-pill flat">estable</span>';
+        if (peak && s.price) {
+          const d = (s.price - peak) / peak;
+          state = d < -0.02 ? `<span class="delta-pill up">−${Math.abs(Math.round(d * 100))}% vs max</span>` : `<span class="delta-pill down">máximo</span>`;
+        }
+        return `<tr onclick="location.hash='${s.key}'">
+          <td><div class="furni-cell"><div class="furni-icon"><img src="${getIcon(s)}"></div><div>${esc(s.name)}</div></div></td>
+          <td>${when}</td>
+          <td>${fmt(s.sold)}</td>
+          <td>${state}</td>
+        </tr>`;
+      }).join("")}</tbody></table>`;
+  }
+
+  // ---- Detail & Chart ----
+  let currentHistory = null;
+
+  function drawChart() {
+    const canvas = $("chart"), ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const w = rect.width, h = rect.height;
+
+    if (!current) return;
+
+    let history = [];
+    if (currentHistory && currentHistory.d) {
+      history = Object.entries(currentHistory.d)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([date, vals]) => ({ date, avg: vals[0], sold: vals[1], offers: vals[2], low: vals[3] }));
+    } else {
+      history = (current.spark || []).map((v) => ({ avg: v }));
+    }
+
+    const data = history.slice(-rangeDays).filter(x => x.avg !== null);
+    if (data.length < 2) {
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.textAlign = "center";
+      ctx.fillText("Sin datos suficientes para este periodo", w/2, h/2);
+      return;
+    }
+
+    const prices = data.map(x => x.avg);
+    if (data.some(x => x.low)) data.forEach(d => { if(d.low) prices.push(d.low); });
+    
+    const minP = Math.min(...prices) * 0.98, maxP = Math.max(...prices) * 1.02;
+    const margin = { top: 20, right: 20, bottom: 40, left: 45 };
+    const chartW = w - margin.left - margin.right;
+    const chartH = h - margin.top - margin.bottom;
+
+    const getX = (i) => margin.left + (i / (data.length - 1)) * chartW;
+    const getY = (p) => margin.top + chartH - ((p - minP) / (maxP - minP)) * chartH;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Grid & Y labels
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.lineWidth = 1;
+    ctx.font = "10px Inter, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.textAlign = "right";
+    
+    [0, 0.25, 0.5, 0.75, 1].forEach(f => {
+      const p = minP + f * (maxP - minP);
+      const y = getY(p);
+      ctx.beginPath(); ctx.moveTo(margin.left, y); ctx.lineTo(w - margin.right, y); ctx.stroke();
+      ctx.fillText(fmt(Math.round(p)), margin.left - 8, y + 3);
+    });
+
+    // Legend
+    ctx.textAlign = "left";
+    ctx.fillText("● Precio Medio", margin.left, margin.top - 8);
+    if (data.some(x => x.low)) {
+      ctx.fillStyle = "#10b981"; ctx.fillText("● Gangas", margin.left + 85, margin.top - 8);
+    }
+    if (data.some(x => x.offers)) {
+      ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillText("■ Stock", margin.left + 150, margin.top - 8);
+    }
+
+    // X Labels
+    ctx.textAlign = "center";
+    const step = Math.max(1, Math.floor(data.length / 6));
+    data.forEach((d, i) => {
+      if (i % step === 0 || i === data.length - 1) {
+        const x = getX(i);
+        if (d.date) {
+           const label = d.date.split("-").slice(1).reverse().join("/");
+           ctx.fillText(label, x, h - 20);
+           if (i === data.length - 1 || i === 0) {
+              ctx.fillText(d.date.split("-")[0], x, h - 8);
+           }
+        }
+      }
+    });
+
+    // Stock bars (optional, light)
+    if (data.some(x => x.offers)) {
+      const maxO = Math.max(...data.map(x => x.offers || 0));
+      data.forEach((d, i) => {
+        if (d.offers) {
+          const bw = (chartW / data.length) * 0.5;
+          const bh = (d.offers / maxO) * chartH * 0.3;
+          ctx.fillStyle = "rgba(255,255,255,0.03)";
+          ctx.fillRect(getX(i) - bw/2, margin.top + chartH - bh, bw, bh);
+        }
+      });
+    }
+
+    // Price Area
+    ctx.beginPath();
+    data.forEach((d, i) => {
+      const x = getX(i), y = getY(d.avg);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.lineTo(getX(data.length - 1), margin.top + chartH);
+    ctx.lineTo(getX(0), margin.top + chartH);
+    const grad = ctx.createLinearGradient(0, margin.top, 0, margin.top + chartH);
+    grad.addColorStop(0, "rgba(124, 58, 237, 0.15)"); grad.addColorStop(1, "transparent");
+    ctx.fillStyle = grad; ctx.fill();
+
+    // Price Line
+    ctx.beginPath();
+    ctx.strokeStyle = "#a78bfa"; ctx.lineWidth = 2.5; ctx.lineJoin = "round";
+    data.forEach((d, i) => {
+      const x = getX(i), y = getY(d.avg);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Low price points
+    data.forEach((d, i) => {
+      if (d.low && d.low < d.avg) {
+        ctx.fillStyle = "#10b981";
+        ctx.beginPath(); ctx.arc(getX(i), getY(d.low), 2, 0, Math.PI*2); ctx.fill();
+      }
+    });
+  }
+
+  async function route() {
+    const k = location.hash.slice(1);
+    if (!k || k === "dashboard-root" || k === "hero") { 
+      $("overlay").classList.remove("active"); 
+      document.body.style.overflow = "";
+      current = null; 
+      currentHistory = null;
+      return; 
+    }
+    const s = all.find((x) => x.key === k);
+    if (!s) return;
+    current = s;
+    $("detail-name").textContent = s.name;
+    $("detail-key").textContent = s.key;
+    $("detail-price").textContent = s.price ? fmt(s.price) : "—";
+    $("detail-fair").textContent = s.fair ? fmt(s.fair) : "—";
+    
+    // Extra Decision Info
+    const extra = $("detail-extra");
+    let html = `<div class="stats-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 24px;">`;
+    if (s.price && s.fair) {
+      const fee = index.fee_pct || 1;
+      const net = Math.round(s.fair * (1 - fee/100) - s.price);
+      const roi = Math.round((net / s.price) * 100);
+      html += `<div class="stat-card"><span class="label">Beneficio Neto (con fee)</span><span class="value ${net > 0 ? 'up' : 'down'}">${net > 0 ? '+' : ''}${fmt(net)} (${roi}%)</span></div>`;
+    }
+    if (s.dr != null) {
+      html += `<div class="stat-card"><span class="label">Liquidez (Días Stock)</span><span class="value">${s.dr} días</span></div>`;
+    }
+    html += `</div>`;
+    
+    if (s.l && s.h) {
+      html += `<div style="background:rgba(255,255,255,0.03); padding:16px; border-radius:12px; margin-bottom:24px; font-size:13px; display:flex; justify-content:space-between;">
+        <span>Rango Normal: <b>${fmt(s.l)}</b> - <b>${fmt(s.h)}</b></span>
+        <span style="color:var(--muted)">Volumen: <b>${fmt(s.sold)}</b>/mes</span>
+      </div>`;
+    }
+    extra.innerHTML = html;
+
+    document.body.style.overflow = "hidden";
+    $("overlay").classList.add("active");
+    drawChart(); // Initial draw with sparkline
+    
+    // Fetch deep history
+    try {
+      const path = `h/${s.t}/${fileName(s.c)}.json`;
+      const r = await fetch(path);
+      if (r.ok) {
+        currentHistory = await r.json();
+        drawChart();
+      }
+    } catch(e) {}
+    
+    const radar = $("radar-box");
+    radar.hidden = true;
+    await loadPrediction();
+    const pk = radarPick(s.key);
+    if (pk) {
+      radar.querySelector("strong").textContent = `Proyección AI: ${pct1(pk.expected)} en ${prediction.horizon_days} días`;
+      radar.querySelector("ul").innerHTML = pk.why.map((w) => `<li>${esc(w)}</li>`).join("");
+      radar.hidden = false;
+    }
+  }
+  window.addEventListener("hashchange", route);
+
+  // ---- App Logic ----
+  function showView(name) {
+    view = name;
+    document.querySelectorAll(".nav-item").forEach(b => {
+      b.classList.toggle("active", b.dataset.view === name);
+    });
+    document.querySelectorAll(".view-content").forEach(v => {
+      v.classList.toggle("active", v.id === name + "-view");
+    });
+    if (name === "radar") renderRadar();
+    if (name === "live") renderLiveTab();
+    if (name === "launches") renderLaunches();
+  }
+  
+  document.querySelector(".nav-group").addEventListener("click", (ev) => {
+    const b = ev.target.closest(".nav-item");
+    if (b) showView(b.dataset.view);
+  });
+
+  $("q").addEventListener("input", () => { shown = PAGE; renderList(); });
+  $("sort").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    sortMode = b.dataset.sort;
+    $("sort").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+    renderList();
+  });
+
+  $("range").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    rangeDays = Number(b.dataset.days);
+    $("range").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+    drawChart();
+  });
+
+  $("back").addEventListener("click", () => {
+    if (window.history.length > 1) history.back();
+    else location.hash = "dashboard-root";
+  });
+  $("overlay").addEventListener("click", (e) => { 
+    if (e.target === $("overlay")) {
+      if (window.history.length > 1) history.back();
+      else location.hash = "dashboard-root";
+    }
+  });
+
+  // ---- Initial Fetch ----
+  fetch(`indice.json?t=${Date.now()}`)
+    .then(r => r.json())
+    .then(json => {
+      index = json;
+      all = Object.entries(index.items || {}).map(([k, e]) => enrich(k, e));
+      
+      $("hero-count").textContent = fmt(all.length);
+      $("hero-count-nexora").textContent = fmt(all.length);
+      $("hotel-name").textContent = index.hotel.toUpperCase();
+      $("hero-hotel-nexora").textContent = index.hotel.toUpperCase();
+      $("market-title").textContent = `Analizando el mercado de ${index.hotel.toUpperCase()}, ${fmt(all.length)} furnis rastreados`;
+      
+      const metaStr = `Actualizado ${ago(index.updated)}`;
+      $("meta").textContent = metaStr;
+      $("hero-sync-nexora").textContent = ago(index.updated);
+      
+      // Hotel switch
+      const switchEl = $("hotel-switch");
+      Object.entries(index.hotels || {}).forEach(([id, cfg]) => {
+        const opt = document.createElement("option");
+        opt.value = id; opt.textContent = cfg.name;
+        opt.selected = id === index.hotel;
+        switchEl.appendChild(opt);
+      });
+      switchEl.addEventListener("change", (e) => {
+        const url = index.hotels[e.target.value].url;
+        location.href = url;
+      });
+
+      renderList();
+      route();
+
+      if (index.live) {
+        const loadLive = async () => {
+          try {
+            const r = await fetch(index.live, { cache: "no-store" });
+            if (!r.ok) return;
+            const data = await r.json();
+            live = data;
+            all.forEach(applyLiveTo);
+            $("live-indicator").hidden = false;
+            const badge = document.querySelector(".nexora-badge");
+            const hotel = $("hotel-name").textContent;
+            badge.textContent = `Habbo Market ${hotel} — En Vivo`;
+            badge.classList.add("live");
+            badge.style.borderColor = "var(--green)";
+            badge.style.color = "var(--green)";
+            if (view === "market") renderList();
+            if (view === "live") renderLiveTab();
+          } catch (e) {}
+        };
+        loadLive();
+        setInterval(loadLive, LIVE_EVERY);
+      }
+    });
+
+  // Budget logic simplified for this example
+  $("budget-go").addEventListener("click", () => {
+    const fee = Number(index.fee_pct ?? 1);
+    const budget = parseInt($("budget").value, 10);
+    if (!budget || budget < 1) return;
+    
+    const cands = all.map((s) => {
+      const net = s.price && s.fair ? Math.round(s.fair * (1 - fee / 100) - s.price) : 0;
+      return { ...s, net, roi: s.price ? net / s.price : 0 };
+    }).filter((s) => !(s.f && daysAgo(s.f) < 14))
+      .filter((s) => s.hasFair && s.price && s.price <= budget && s.perDay >= 1 && s.dr != null && s.dr <= budgetDays && s.net >= 2 && s.roi >= 0.03)
+      .sort((a, b) => b.roi - a.roi || b.perDay - a.perDay);
+    
+    const picks = []; let left = budget;
+    for (const c of cands) {
+      if (picks.length >= 10) break;
+      if (c.price <= left) { picks.push(c); left -= c.price; }
+    }
+    
+    if (!picks.length) {
+      $("budget-out").innerHTML = `<div class="empty"><strong>Nada convence por ahora</strong>Ningún furni que quepa en tu presupuesto está por debajo de su precio justo y se revende en ${budgetDays} días o menos.</div>`;
+      return;
+    }
+    
+    const spent = budget - left, profit = picks.reduce((a, p) => a + p.net, 0);
+    $("budget-out").innerHTML = `
+      <div class="stats-grid" style="margin-top:24px">
+        <div class="stat-card">
+          <span class="label">Inversión Total</span>
+          <span class="value">${fmt(spent)}</span>
+        </div>
+        <div class="stat-card">
+          <span class="label">Ganancia Estipada</span>
+          <span class="value" style="color:var(--green)">+${fmt(profit)}</span>
+        </div>
+      </div>
+      <div class="data-section" style="margin-top:24px">
+        <table class="market-table">
+          <thead><tr><th>Furni</th><th>Vende a</th><th>ROI</th><th>Tiempo</th></tr></thead>
+          <tbody>
+            ${picks.map(p => `<tr data-key="${p.key}">
+              <td><div class="furni-cell">
+                <div class="furni-icon"><img src="${getIcon(p)}"></div>
+                <div>${esc(p.name)}</div>
+              </div></td>
+              <td><div class="price-val">${fmt(p.fair)}</div></td>
+              <td><div class="delta-pill down">+${fmt(p.net)} (${Math.round(p.roi * 100)}%)</div></td>
+              <td>~${fmt(Math.max(1, Math.round(p.dr)))} días</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`;
+    bindRows($("budget-out"));
+  });
+
+  // Handle Telegram alerts
+  if (!index.bot) {
+    document.body.classList.add("no-alerts");
+  } else {
+    $("alerts-container").innerHTML = `
+      <div class="stat-card" style="margin-bottom:24px; background:rgba(124, 58, 237, 0.1); border-color:rgba(124, 58, 237, 0.3); display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h3 style="margin:0 0 4px; font-family:var(--font-head);">Alertas de Telegram Activas</h3>
+          <p style="margin:0; color:var(--muted); font-size:13px;">Recibe notificaciones de gangas y radar directamente en tu móvil.</p>
+        </div>
+        <a href="https://t.me/${index.bot}" target="_blank" class="btn-submit" style="text-decoration:none; padding:10px 20px; font-size:13px;">Unirse al Canal</a>
+      </div>
+    `;
+  }
+
+})();
+</script>
+</body>
+</html>
